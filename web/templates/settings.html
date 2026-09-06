@@ -1,0 +1,33 @@
+\
+{% extends "base.html" %}
+{% block content %}
+<h1>Agent Settings</h1>
+<div class="card">
+<form method="post" action="/settings">
+  <div class="row">
+    <div><label>Fresh-job window (minutes)</label><input type="number" name="fresh_job_window_minutes" value="{{ values.fresh_job_window_minutes }}" min="1"></div>
+    <div><label>Possible-fit threshold</label><input type="number" name="minimum_fit_score" value="{{ values.minimum_fit_score }}" min="0" max="100"></div>
+    <div><label>Immediate-alert threshold</label><input type="number" name="immediate_alert_score" value="{{ values.immediate_alert_score }}" min="0" max="100"></div>
+  </div>
+  <label style="margin-top:18px"><input style="width:auto" type="checkbox" name="allow_unverified_current_jobs_in_digest" value="true" {% if values.allow_unverified_current_jobs_in_digest %}checked{% endif %}> Include current jobs with unverified timestamps in high-priority digest routing</label>
+  <button class="btn" style="margin-top:12px">Save Settings</button>
+</form>
+</div>
+
+<h2>Search terms</h2>
+<div class="card">
+<form method="post" action="/settings/search-terms/add" class="row">
+  <div><label>New search phrase</label><input name="term" placeholder="Payroll Clerk" required></div>
+  <div style="flex:0 0 auto"><button class="btn">Add Search</button></div>
+</form>
+</div>
+<table style="margin-top:14px">
+<tr><th>Search term</th><th>Enabled</th><th>Actions</th></tr>
+{% for term in terms %}
+<tr><td>{{ term.term }}</td><td>{{ "Yes" if term.enabled else "No" }}</td><td>
+<form class="inline" method="post" action="/settings/search-terms/{{ term.id }}/toggle"><button class="btn secondary">{{ "Disable" if term.enabled else "Enable" }}</button></form>
+<form class="inline" method="post" action="/settings/search-terms/{{ term.id }}/delete"><button class="btn danger">Delete</button></form>
+</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

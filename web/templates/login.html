@@ -1,0 +1,16 @@
+\
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Job Agent Login</title>
+<style>
+body{font-family:system-ui;background:#f5f7fb;display:grid;place-items:center;height:100vh;margin:0;color:#162033}
+.card{width:min(420px,92vw);background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.06)}
+input{width:100%;padding:12px;border:1px solid #cfd4dc;border-radius:9px;box-sizing:border-box}
+button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:9px;background:#2563eb;color:white;font-weight:700}
+.error{color:#b42318}
+</style></head>
+<body><div class="card">
+<h1>Calaveras Job Agent</h1><p>Administrator sign in</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post"><input name="password" type="password" placeholder="Admin password" required><button>Sign in</button></form>
+</div></body></html>

@@ -1,75 +1,84 @@
 \
-# Calaveras County Job Agent
+# Calaveras County Job Agent — Version 2
 
-A two-agent starter system:
+A deployable job-search and resume-fit system for Joshua George.
 
-1. **Job Scout / ingestion layer** searches configured sources, normalizes jobs,
-   enforces Calaveras County locality, verifies timestamp freshness when possible,
-   and deduplicates postings.
-2. **Resume Evaluator** compares each new local job against a master candidate
-   profile derived from the two Joshua George resumes and returns a fit score,
-   explanation, gaps, and which resume to use.
+## What Version 2 adds
 
-## What works now
+- Browser-based administration dashboard.
+- Password-protected admin login.
+- **Start / Pause Search** control.
+- **Run Search Now** control.
+- Editable search terms.
+- Editable freshness / fit / alert thresholds.
+- PostgreSQL-backed application settings.
+- Job review and application statuses.
+- Run history and error logging.
+- SMTP email alerts.
+- Resume-version upload/storage tracking.
+- Docker container.
+- Cloud Run Service + Cloud Run Job architecture.
+- Google Cloud deployment guide.
+- GitHub Actions unit tests.
 
-- SQLite by default; PostgreSQL supported via `DATABASE_URL`.
-- Demo provider works without credentials.
-- Adzuna provider is implemented and uses its exact `created` timestamp when
-  returned.
-- 60-minute freshness classification.
-- Strict local whitelist filter.
-- SHA-256 deduplication fingerprint.
-- AI evaluator via OpenAI Responses API when `OPENAI_API_KEY` is present.
-- Deterministic fallback evaluator when no OpenAI key is present.
-- Resume-selection logic.
-- Console alerts.
-- Unit tests for locality and freshness.
+The original two-agent engine remains:
 
-## Important behavior
+1. **Scout** finds and normalizes jobs and enforces locality/timestamp rules.
+2. **Evaluator** compares new jobs with Joshua's master candidate profile.
 
-A job is **not** considered a verified last-hour job unless an exact timestamp is
-available. A job with no timestamp can be stored/evaluated but is not allowed
-into the strict immediate-last-hour queue.
-
-The candidate profile also contains truth constraints so the evaluator does not
-turn coursework into work experience or claim certifications/skills that the
-resumes do not support.
-
-## Quick start
+## Local test
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
+```
+
+Edit `.env` and set at least:
+
+```env
+ADMIN_PASSWORD=choose-a-long-password
+SESSION_SECRET=choose-a-different-long-random-secret
+JOB_PROVIDER=demo
+```
+
+Start the dashboard:
+
+```bash
+uvicorn web.app:app --reload
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+The demo provider does not require API credentials.
+
+## Worker only
+
+```bash
 python run.py
 ```
 
-The default `JOB_PROVIDER=demo` runs the whole pipeline with a fresh sample
-Murphys bookkeeping job.
-
-Run tests:
+## Docker
 
 ```bash
-python -m unittest discover -s tests -v
+docker build -t calaveras-job-agent .
+docker run --rm -p 8080:8080 --env-file .env calaveras-job-agent
 ```
 
-## Enable AI evaluation
+Then open:
 
-Edit `.env`:
-
-```env
-OPENAI_API_KEY=your_key_here
-OPENAI_MODEL=gpt-5.6-luna
+```text
+http://localhost:8080
 ```
 
-Without an API key, the pipeline still runs but uses a deterministic scoring
-prior instead of semantic resume analysis.
+## Live job provider
 
-## Enable live Adzuna search
-
-1. Register for an Adzuna API application.
-2. Add credentials to `.env`:
+Set:
 
 ```env
 JOB_PROVIDER=adzuna
@@ -77,62 +86,79 @@ ADZUNA_APP_ID=...
 ADZUNA_APP_KEY=...
 ```
 
-3. Run:
+Adzuna's returned `created` timestamp is used when available. Jobs without an
+exact timestamp are never promoted to the strict "verified within 60 minutes"
+queue.
 
-```bash
-python run.py
-```
+## OpenAI evaluator
 
-## PostgreSQL production mode
+Set:
 
 ```env
-DATABASE_URL=postgresql+psycopg://jobagent:password@localhost:5432/jobagent
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-5.6-luna
 ```
 
-Create the database first; SQLAlchemy creates the tables.
+If no OpenAI key is present, the system still runs using the deterministic
+fallback evaluator.
 
-## Schedule every 15 minutes
+## Job statuses
 
-Linux/macOS cron example:
-
-```cron
-*/15 * * * * cd /path/to/calaveras_job_agent && .venv/bin/python run.py >> job-agent.log 2>&1
-```
-
-For a server deployment, use a service scheduler (systemd timer, container
-scheduler, n8n, cloud scheduler) rather than depending on a laptop staying on.
-
-## Processing flow
+The dashboard supports:
 
 ```text
-Scheduler
-   |
-   v
-Provider search
-   |
-   v
-Normalize + local filter + freshness
-   |
-   v
-Deduplicate / persist
-   |
-   v
-Resume Evaluator
-   |
-   v
-Score + resume selection
-   |
-   +--> verified <=60 min & score >=75 --> immediate alert
-   +--> verified <=60 min & score 60-74 --> possible-fit alert
-   +--> unverified timestamp & score >=75 --> digest queue
-   +--> score <60 --> silent storage
+new
+reviewed
+interested
+applied
+interview
+rejected
+hired
+ignore
+expired
 ```
 
-## Next production upgrades
+## Resume uploads
 
-- Add an email/SMS notifier.
-- Add a second job provider for redundancy.
-- Add original-employer-page timestamp verification.
-- Add commute-distance calculation from Avery.
-- Add a web dashboard for New / Strong Fit / Applied / Rejected.
-- Add application tracking and tailored-resume generation after user approval.
+The Resume Manager can store current focused and all-work-experience DOCX/PDF
+files. Configure `GCS_BUCKET` in Google Cloud for persistent storage.
+
+For safety, Version 2 does **not** automatically rewrite the master candidate
+profile from an uploaded resume. This prevents a parsing/model error from
+silently adding qualifications Joshua does not have.
+
+## Google Cloud
+
+See:
+
+```text
+deploy/gcp/README.md
+```
+
+Recommended production architecture:
+
+```text
+Cloud Run Service
+    Admin dashboard
+          |
+          v
+Cloud SQL PostgreSQL
+          ^
+          |
+Cloud Run Job <--- Cloud Scheduler (every 15 minutes)
+          |
+          +--- Secret Manager
+          +--- OpenAI
+          +--- Job provider
+          +--- SMTP email
+```
+
+## Security notes
+
+- Never commit `.env`.
+- Put API keys/passwords in Google Secret Manager.
+- Use a long random `ADMIN_PASSWORD` and separate `SESSION_SECRET`.
+- Use HTTPS in production (Cloud Run provides HTTPS).
+- Do not make the database public to the internet unless you have a specific
+  reason and understand the network controls.
+- The agent does not auto-apply to jobs.

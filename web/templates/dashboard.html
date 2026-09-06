@@ -1,0 +1,34 @@
+\
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<div class="grid">
+  <div class="card"><div class="muted">Agent status</div><div class="metric {% if enabled %}good{% else %}bad{% endif %}">{{ "RUNNING" if enabled else "PAUSED" }}</div></div>
+  <div class="card"><div class="muted">Jobs stored</div><div class="metric">{{ total_jobs }}</div></div>
+  <div class="card"><div class="muted">Strong evaluations</div><div class="metric">{{ strong }}</div></div>
+  <div class="card"><div class="muted">Last run</div><div class="metric" style="font-size:18px">{{ latest_run.status if latest_run else "Never" }}</div><div class="muted">{{ latest_run.started_at if latest_run else "" }}</div></div>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <form class="inline" method="post" action="/admin/toggle">
+    <button class="btn {% if enabled %}danger{% else %}good{% endif %}">{{ "Pause Search" if enabled else "Start Search" }}</button>
+  </form>
+  <form class="inline" method="post" action="/admin/run-now">
+    <button class="btn">Run Search Now</button>
+  </form>
+</div>
+
+<h2>Recent jobs</h2>
+<table>
+<tr><th>Job</th><th>Location</th><th>Freshness</th><th>Fit</th><th>Status</th></tr>
+{% for job, ev in recent %}
+<tr>
+<td><strong>{{ job.title }}</strong><br><span class="muted">{{ job.company }}</span></td>
+<td>{{ job.location or "—" }}</td>
+<td>{{ job.freshness_status }}</td>
+<td>{% if ev %}<strong>{{ ev.fit_score }}%</strong><br>{{ ev.classification }}{% else %}—{% endif %}</td>
+<td><span class="pill">{{ job.status }}</span></td>
+</tr>
+{% else %}<tr><td colspan="5">No jobs yet. Use <strong>Run Search Now</strong>.</td></tr>{% endfor %}
+</table>
+{% endblock %}

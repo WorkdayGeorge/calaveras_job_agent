@@ -38,18 +38,6 @@ class Job(Base):
     is_local: Mapped[bool] = mapped_column(Boolean, default=False)
     freshness_status: Mapped[str] = mapped_column(String(50), default="unverified")
 
-class Resume(Base):
-    __tablename__ = "resumes"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    version: Mapped[str] = mapped_column(String(50), nullable=False)
-    resume_text: Mapped[str] = mapped_column(Text, nullable=False)
-    skills: Mapped[dict] = mapped_column(JSON, default=dict)
-    experience: Mapped[list] = mapped_column(JSON, default=list)
-    education: Mapped[list] = mapped_column(JSON, default=list)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    is_current: Mapped[bool] = mapped_column(Boolean, default=True)
-
 class Evaluation(Base):
     __tablename__ = "evaluations"
     __table_args__ = (UniqueConstraint("job_id", "resume_version", name="uq_job_resume_version"),)
@@ -78,3 +66,43 @@ class Notification(Base):
     channel: Mapped[str] = mapped_column(String(50), default="console")
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(30), default="sent")
+    detail: Mapped[str | None] = mapped_column(Text)
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class SearchTerm(Base):
+    __tablename__ = "search_terms"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    term: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+class RunLog(Base):
+    __tablename__ = "run_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(30), default="running")
+    provider: Mapped[str | None] = mapped_column(String(100))
+    found: Mapped[int] = mapped_column(Integer, default=0)
+    new_local_jobs: Mapped[int] = mapped_column(Integer, default=0)
+    evaluated: Mapped[int] = mapped_column(Integer, default=0)
+    alerts: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
+
+class ResumeAsset(Base):
+    __tablename__ = "resume_assets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    resume_type: Mapped[str] = mapped_column(String(50), nullable=False)  # focused | all-work-experience
+    filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True)

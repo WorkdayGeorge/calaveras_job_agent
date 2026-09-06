@@ -1,0 +1,26 @@
+\
+{% extends "base.html" %}
+{% block content %}
+<h1>Jobs</h1>
+<p class="muted">Track each opportunity from discovery through application.</p>
+<table>
+<tr><th>Job</th><th>Posted</th><th>Fit</th><th>Recommendation</th><th>Status</th><th>Apply</th></tr>
+{% for job, ev in rows %}
+<tr>
+<td><strong>{{ job.title }}</strong><br>{{ job.company }}<br><span class="muted">{{ job.location or "—" }}</span></td>
+<td>{{ job.posted_at or "Unverified" }}<br><span class="muted">{{ job.freshness_status }}</span></td>
+<td>{% if ev %}<strong>{{ ev.fit_score }}%</strong><br>{{ ev.classification }}<br><span class="muted">{{ ev.selected_resume }}</span>{% else %}—{% endif %}</td>
+<td>{% if ev %}{{ ev.recommendation }}<br><small>{{ ev.reasoning }}</small>{% else %}—{% endif %}</td>
+<td>
+<form method="post" action="/jobs/{{ job.id }}/status">
+<select name="status" onchange="this.form.submit()">
+{% for s in ["new","reviewed","interested","applied","interview","rejected","hired","ignore","expired"] %}
+<option value="{{ s }}" {% if job.status == s %}selected{% endif %}>{{ s }}</option>
+{% endfor %}
+</select></form>
+</td>
+<td><a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener">Open</a></td>
+</tr>
+{% else %}<tr><td colspan="6">No jobs stored yet.</td></tr>{% endfor %}
+</table>
+{% endblock %}

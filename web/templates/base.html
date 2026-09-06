@@ -1,0 +1,55 @@
+\
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "Calaveras Job Agent" }}</title>
+  <style>
+    :root { --bg:#f5f7fb; --card:#fff; --ink:#162033; --muted:#667085; --line:#e5e7eb; --accent:#2563eb; --good:#16803c; --warn:#b26a00; --bad:#b42318; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif; background:var(--bg); color:var(--ink); }
+    header { background:#0f172a; color:white; padding:14px 24px; display:flex; justify-content:space-between; align-items:center; gap:20px; }
+    header a { color:#dbeafe; text-decoration:none; margin-right:16px; }
+    header strong { margin-right:28px; }
+    main { max-width:1180px; margin:28px auto; padding:0 20px 60px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 1px 3px rgba(16,24,40,.04); }
+    .metric { font-size:30px; font-weight:750; margin:6px 0; }
+    .muted { color:var(--muted); }
+    .good { color:var(--good); font-weight:700; }
+    .bad { color:var(--bad); font-weight:700; }
+    .warn { color:var(--warn); font-weight:700; }
+    .btn { display:inline-block; border:0; border-radius:9px; padding:10px 14px; background:var(--accent); color:#fff; cursor:pointer; text-decoration:none; font-weight:650; }
+    .btn.secondary { background:#475467; }
+    .btn.danger { background:#b42318; }
+    .btn.good { background:#16803c; }
+    form.inline { display:inline; }
+    table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; }
+    th,td { text-align:left; padding:12px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { background:#f8fafc; font-size:13px; color:#475467; }
+    input,select { width:100%; padding:10px 11px; border:1px solid #cfd4dc; border-radius:8px; background:#fff; }
+    label { display:block; font-weight:650; margin:10px 0 6px; }
+    .row { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
+    .row > div { flex:1; min-width:180px; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; font-size:12px; font-weight:700; }
+    h1 { margin-top:0; }
+    h2 { margin-top:28px; }
+    @media (max-width:760px) { header { align-items:flex-start; flex-direction:column; } table { font-size:13px; } }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <strong>Calaveras Job Agent</strong>
+    <a href="/">Dashboard</a>
+    <a href="/jobs">Jobs</a>
+    <a href="/settings">Settings</a>
+    <a href="/resumes">Resumes</a>
+    <a href="/runs">Runs</a>
+  </div>
+  <form method="post" action="/logout"><button class="btn secondary">Sign out</button></form>
+</header>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

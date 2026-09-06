@@ -1,0 +1,23 @@
+\
+{% extends "base.html" %}
+{% block content %}
+<h1>Resume Manager</h1>
+<div class="card">
+<p>Upload the current focused accounting/technical resume or the full work-history resume. In Google Cloud, configure <code>GCS_BUCKET</code> so uploads persist.</p>
+<form method="post" action="/resumes/upload" enctype="multipart/form-data">
+<div class="row">
+<div><label>Resume type</label><select name="resume_type"><option value="focused">Focused Accounting / Technical</option><option value="all-work-experience">All Work Experience</option></select></div>
+<div><label>DOCX or PDF</label><input type="file" name="resume" accept=".docx,.pdf" required></div>
+<div style="flex:0 0 auto"><button class="btn">Upload</button></div>
+</div>
+</form>
+</div>
+<h2>Uploaded versions</h2>
+<table>
+<tr><th>Type</th><th>Filename</th><th>Uploaded</th><th>Current</th></tr>
+{% for a in assets %}
+<tr><td>{{ a.resume_type }}</td><td>{{ a.filename }}</td><td>{{ a.uploaded_at }}</td><td>{{ "Yes" if a.is_current else "No" }}</td></tr>
+{% else %}<tr><td colspan="4">No dashboard-managed resumes uploaded yet. The built-in master candidate profile is still active.</td></tr>{% endfor %}
+</table>
+<p class="muted">Version 2 stores uploaded resume files and tracks the active version. Automatic re-extraction of the master candidate profile from a newly uploaded resume is intentionally not enabled yet, so an upload cannot silently change Joshua's qualifications.</p>
+{% endblock %}
