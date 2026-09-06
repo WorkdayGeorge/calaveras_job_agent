@@ -1,0 +1,39 @@
+location:
+  primary: "Calaveras County, CA"
+  # Conservative local whitelist used when a provider does not return a county.
+  allowed_localities:
+    - "Angels Camp"
+    - "Arnold"
+    - "Avery"
+    - "Copperopolis"
+    - "Murphys"
+    - "San Andreas"
+    - "Valley Springs"
+    - "Mokelumne Hill"
+    - "West Point"
+    - "Mountain Ranch"
+
+search_interval_minutes: 15
+fresh_job_window_minutes: 60
+
+categories:
+  - "bookkeeping"
+  - "accounting clerk"
+  - "accounts payable"
+  - "accounts receivable"
+  - "administrative assistant"
+  - "inventory"
+  - "warehouse coordinator"
+  - "IT support"
+
+minimum_fit_score: 60
+immediate_alert_score: 75
+
+resume_strategy:
+  qualification_source: "all-work-experience"
+  career_direction_source: "accounting-technical"
+  preferred_accounting_resume: "focused"
+
+timestamp_policy:
+  exact_required_for_last_hour_alert: true
+  allow_unverified_current_jobs_in_digest: true

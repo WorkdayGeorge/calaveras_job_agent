@@ -1,0 +1,156 @@
+{
+  "name": "Joshua George",
+  "location": "Avery, CA",
+  "career_targets": [
+    "entry-level bookkeeping",
+    "accounting assistant",
+    "administrative support",
+    "inventory/warehouse coordination",
+    "entry-level IT support"
+  ],
+  "skills": {
+    "accounting_office": [
+      "Bookkeeping fundamentals",
+      "Accounting coursework",
+      "Microsoft Excel",
+      "Microsoft Word",
+      "Microsoft Outlook",
+      "Data entry",
+      "Recordkeeping",
+      "Inventory reconciliation",
+      "Reporting support"
+    ],
+    "data_technical": [
+      "Google Data Analytics coursework",
+      "Data preparation",
+      "Data analysis",
+      "Data visualization",
+      "R programming coursework",
+      "JDE inventory system",
+      "Windows installation and troubleshooting",
+      "IT essentials",
+      "Cisco networking training",
+      "CompTIA Security+ training"
+    ],
+    "operations": [
+      "Inventory management",
+      "Cycle counts",
+      "Shipping and receiving",
+      "Warehouse coordination",
+      "Truck/driver coordination",
+      "Safety procedures"
+    ],
+    "transferable": [
+      "Customer service",
+      "Employee training",
+      "Team collaboration",
+      "Process organization",
+      "Military IT training"
+    ]
+  },
+  "experience": [
+    {
+      "role": "Warehouse Coordinator",
+      "company": "Ironstone Vineyards",
+      "location": "Murphys, CA",
+      "dates": "March 2024 - June 2025",
+      "highlights": [
+        "Maintained accurate inventory records",
+        "Coordinated stock replenishment",
+        "Supported shipping and receiving",
+        "Resolved inventory discrepancies through organized recordkeeping"
+      ]
+    },
+    {
+      "role": "Warehouse / Inventory Operations",
+      "company": "The Wine Group",
+      "location": "Livermore, CA",
+      "dates": "September 2021 - May 2022",
+      "highlights": [
+        "Performed inventory cycle counts",
+        "Used JDE to track inventory and process adjustments",
+        "Maintained database accuracy",
+        "Coordinated incoming and outgoing product"
+      ]
+    },
+    {
+      "role": "Package Handler / Trainer",
+      "company": "FedEx Ground",
+      "location": "Tracy, CA",
+      "dates": "September 2017 - April 2021",
+      "highlights": [
+        "Scanned and processed packages",
+        "Trained new employees on procedures and safety"
+      ]
+    },
+    {
+      "role": "Data Entry / Customer Service",
+      "company": "Round Table Pizza",
+      "location": "Concord, CA",
+      "dates": "August 2016 - March 2017",
+      "highlights": [
+        "Entered and updated pricing information",
+        "Used Microsoft Excel",
+        "Maintained accurate records",
+        "Assisted with customer service"
+      ]
+    },
+    {
+      "role": "U.S. Army - MOS 25B Information Technology Specialist",
+      "company": "U.S. Army",
+      "location": "Fort Eisenhower, GA",
+      "dates": "July 2014 - July 2015",
+      "highlights": [
+        "IT and computer systems training",
+        "IT essentials",
+        "CompTIA Security+ training",
+        "Cisco networking fundamentals",
+        "Honorable discharge"
+      ]
+    }
+  ],
+  "education_training": [
+    {
+      "name": "Accounting & Bookkeeping Coursework",
+      "provider": "Course Careers",
+      "status": "completed coursework"
+    },
+    {
+      "name": "Google Data Analytics Coursework",
+      "provider": "Google",
+      "status": "coursework completed; final project not completed; no professional certificate awarded"
+    },
+    {
+      "name": "Information Technology Training",
+      "provider": "AIT School",
+      "status": "training completed"
+    }
+  ],
+  "resume_selection_rules": {
+    "focused": [
+      "bookkeeping",
+      "accounting",
+      "accounts payable",
+      "accounts receivable",
+      "payroll",
+      "administrative",
+      "data entry"
+    ],
+    "all_work_experience": [
+      "warehouse",
+      "inventory",
+      "shipping",
+      "receiving",
+      "operations",
+      "trainer",
+      "general labor",
+      "IT support"
+    ]
+  },
+  "truth_constraints": [
+    "Do not claim a Google Data Analytics professional certificate.",
+    "Do not claim QuickBooks experience unless separately added later.",
+    "Do not claim direct AP, AR, payroll, journal-entry, or tax-preparation employment unless supported by new evidence.",
+    "Treat coursework and training as training, not employment experience."
+  ]
+}
