@@ -59,7 +59,7 @@ def deterministic_prior(job: dict, profile: dict) -> dict:
     return {"score": round(weighted, 1), "breakdown": scores}
 
 def classify(score: int | float) -> tuple[str, str]:
-    if score >= 80:
+    if score >= 75:
         return "Strong Fit", "Apply"
     if score >= 60:
         return "Possible Fit", "Review"

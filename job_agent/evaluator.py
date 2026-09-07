@@ -64,6 +64,7 @@ def evaluate_job(job: dict, profile: dict) -> dict:
 
     # Hard validation/normalization.
     result["fit_score"] = max(0, min(100, int(result["fit_score"])))
+    result["classification"], result["recommendation"] = classify(result["fit_score"])
     if result.get("selected_resume") not in {"focused", "all-work-experience"}:
         result["selected_resume"] = _select_resume_fallback(job, profile)
     return result
