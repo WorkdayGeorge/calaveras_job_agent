@@ -191,12 +191,12 @@ class CCWDProvider(JobProvider):
         self._jobs = jobs
         return jobs
 
-    def search(self, term, location=None):
+    def search(self, role=None, location=None):
         jobs = self._load_jobs()
 
         tokens = [
             token
-            for token in re.findall(r"[a-z0-9]+", (term or "").lower())
+            for token in re.findall(r"[a-z0-9]+", (role or "").lower())
             if len(token) >= 3
         ]
 
