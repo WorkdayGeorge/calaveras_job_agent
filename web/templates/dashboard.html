@@ -2,6 +2,13 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Dashboard</h1>
+
+{% set message = request.query_params.get("message") %}
+{% if message %}
+  <div class="card {% if 'failed' in message|lower or 'error' in message|lower %}bad{% else %}good{% endif %}" style="margin-bottom:18px">
+    <strong>{{ message }}</strong>
+  </div>
+{% endif %}
 <div class="grid">
   <div class="card"><div class="muted">Agent status</div><div class="metric {% if enabled %}good{% else %}bad{% endif %}">{{ "RUNNING" if enabled else "PAUSED" }}</div></div>
   <div class="card"><div class="muted">Jobs stored</div><div class="metric">{{ total_jobs }}</div></div>
