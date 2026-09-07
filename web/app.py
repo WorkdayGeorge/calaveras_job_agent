@@ -15,6 +15,7 @@ from sqlalchemy import select, desc, func
 from job_agent.db import init_db, SessionLocal
 from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset
 from job_agent.config import load_settings, env
+from job_agent.notify import email_notify
 from job_agent.settings_store import (
     seed_settings, get_bool, get_int, set_setting
 )
@@ -125,6 +126,44 @@ def run_now(request: Request, background_tasks: BackgroundTasks):
         return denial
     background_tasks.add_task(trigger_worker)
     return RedirectResponse("/?message=Run+requested", status_code=303)
+
+@app.post("/admin/test-email")
+def test_email(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+
+    test_job = {
+        "title": "Email Notification Test",
+        "company": "Calaveras Job Agent",
+        "location": "Calaveras County, CA",
+        "freshness_status": "verified_fresh",
+        "apply_url": "https://example.com",
+    }
+
+    test_evaluation = {
+        "fit_score": 100,
+        "classification": "Test Alert",
+        "recommendation": "Email system is working",
+        "selected_resume": "focused",
+        "reasoning": "This is a test of the Calaveras Job Agent email notification system.",
+        "missing_requirements": [],
+    }
+
+    sent, result = email_notify(
+        test_job,
+        test_evaluation,
+        "test",
+    )
+
+    if sent:
+        return RedirectResponse("/?message=Test+email+sent", status_code=303)
+
+    return RedirectResponse(
+        f"/?message=Test+email+failed:+{result}",
+        status_code=303,
+    )
+
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
