@@ -8,7 +8,7 @@ from job_agent.schemas import RawJob
 SETTINGS = {
     "location": {
         "primary": "Calaveras County, CA",
-        "allowed_localities": ["Murphys", "Angels Camp", "Avery", "San Andreas"]
+        "allowed_localities": ["Murphys", "Angels Camp", "Avery", "Bear Valley", "San Andreas"]
     },
     "fresh_job_window_minutes": 60,
 }
@@ -16,6 +16,9 @@ SETTINGS = {
 class NormalizeTests(unittest.TestCase):
     def test_local_murphys(self):
         self.assertTrue(is_local_location("Murphys, CA", SETTINGS))
+
+    def test_local_bear_valley(self):
+        self.assertTrue(is_local_location("Bear Valley, CA 95223", SETTINGS))
 
     def test_nonlocal(self):
         self.assertFalse(is_local_location("Sonora, CA", SETTINGS))
