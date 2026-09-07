@@ -18,13 +18,21 @@ from .settings_store import (
 
 RESUME_VERSION = "master-profile-v1"
 
-def get_provider():
-    name = (env("JOB_PROVIDER", "demo") or "demo").lower()
-    if name == "adzuna":
-        return AdzunaProvider()
-    if name == "demo":
-        return DemoProvider()
-    raise ValueError(f"Unknown JOB_PROVIDER={name}")
+def get_providers():
+    raw = env("JOB_PROVIDERS") or env("JOB_PROVIDER", "demo") or "demo"
+    names = [name.strip().lower() for name in raw.split(",") if name.strip()]
+
+    providers = []
+
+    for name in names:
+        if name == "adzuna":
+            providers.append(AdzunaProvider())
+        elif name == "demo":
+            providers.append(DemoProvider())
+        else:
+            raise ValueError(f"Unknown job provider: {name}")
+
+    return providers
 
 def job_to_dict(job) -> dict:
     return {
@@ -75,12 +83,13 @@ def run_once(force: bool = False) -> dict:
 
         settings = _runtime_settings(session, yaml_settings)
         terms = enabled_terms(session)
-        provider = get_provider()
+        providers = get_providers()
+        provider_names = ",".join(type(p).__name__.replace("Provider", "").lower() for p in providers)
 
         run = RunLog(
             started_at=datetime.now(timezone.utc),
             status="running",
-            provider=(env("JOB_PROVIDER", "demo") or "demo"),
+            provider=provider_names,
         )
         session.add(run)
         session.commit()
@@ -90,63 +99,64 @@ def run_once(force: bool = False) -> dict:
         now = datetime.now(timezone.utc)
 
         try:
-            for role in terms:
-                raw_jobs = provider.search(
-                    role=role,
-                    location=settings["location"]["primary"],
-                    results_per_page=25,
-                )
-                found += len(raw_jobs)
-
-                for raw in raw_jobs:
-                    normalized = normalize_job(raw, settings, now=now)
-                    if not normalized.is_local:
-                        continue
-
-                    job, is_new = upsert_job(session, normalized)
-                    if is_new:
-                        inserted += 1
-
-                    if evaluation_exists(session, job.id, RESUME_VERSION):
-                        continue
-
-                    job_dict = job_to_dict(job)
-                    result = evaluate_job(job_dict, profile)
-                    evaluated += 1
-
-                    evaluation = Evaluation(
-                        job_id=job.id,
-                        resume_version=RESUME_VERSION,
-                        fit_score=int(result["fit_score"]),
-                        classification=result["classification"],
-                        recommendation=result["recommendation"],
-                        selected_resume=result["selected_resume"],
-                        matching_skills=result.get("matching_skills", []),
-                        transferable_skills=result.get("transferable_skills", []),
-                        missing_requirements=result.get("missing_requirements", []),
-                        uncertain_requirements=result.get("uncertain_requirements", []),
-                        reasoning=result["reasoning"],
-                        score_breakdown=result.get("score_breakdown", {}),
-                        evaluated_at=datetime.now(timezone.utc),
+            for provider in providers:
+                for role in terms:
+                    raw_jobs = provider.search(
+                        role=role,
+                        location=settings["location"]["primary"],
+                        results_per_page=25,
                     )
-                    session.add(evaluation)
-                    session.commit()
-                    session.refresh(evaluation)
+                    found += len(raw_jobs)
 
-                    bucket = notification_bucket(job_dict, result, settings)
-                    if bucket != "silent":
-                        alerts += 1
-                        console_notify(job_dict, result, bucket)
-                        sent, detail = email_notify(job_dict, result, bucket)
-                        session.add(Notification(
+                    for raw in raw_jobs:
+                        normalized = normalize_job(raw, settings, now=now)
+                        if not normalized.is_local:
+                            continue
+    
+                        job, is_new = upsert_job(session, normalized)
+                        if is_new:
+                            inserted += 1
+    
+                        if evaluation_exists(session, job.id, RESUME_VERSION):
+                            continue
+    
+                        job_dict = job_to_dict(job)
+                        result = evaluate_job(job_dict, profile)
+                        evaluated += 1
+    
+                        evaluation = Evaluation(
                             job_id=job.id,
-                            evaluation_id=evaluation.id,
-                            channel="email" if sent else "console",
-                            sent_at=datetime.now(timezone.utc),
-                            status="sent" if sent else "not_sent",
-                            detail=detail,
-                        ))
+                            resume_version=RESUME_VERSION,
+                            fit_score=int(result["fit_score"]),
+                            classification=result["classification"],
+                            recommendation=result["recommendation"],
+                            selected_resume=result["selected_resume"],
+                            matching_skills=result.get("matching_skills", []),
+                            transferable_skills=result.get("transferable_skills", []),
+                            missing_requirements=result.get("missing_requirements", []),
+                            uncertain_requirements=result.get("uncertain_requirements", []),
+                            reasoning=result["reasoning"],
+                            score_breakdown=result.get("score_breakdown", {}),
+                            evaluated_at=datetime.now(timezone.utc),
+                        )
+                        session.add(evaluation)
                         session.commit()
+                        session.refresh(evaluation)
+    
+                        bucket = notification_bucket(job_dict, result, settings)
+                        if bucket != "silent":
+                            alerts += 1
+                            console_notify(job_dict, result, bucket)
+                            sent, detail = email_notify(job_dict, result, bucket)
+                            session.add(Notification(
+                                job_id=job.id,
+                                evaluation_id=evaluation.id,
+                                channel="email" if sent else "console",
+                                sent_at=datetime.now(timezone.utc),
+                                status="sent" if sent else "not_sent",
+                                detail=detail,
+                            ))
+                            session.commit()
 
             run.finished_at = datetime.now(timezone.utc)
             run.status = "success"
@@ -158,7 +168,7 @@ def run_once(force: bool = False) -> dict:
 
             summary = {
                 "status": "success",
-                "provider": env("JOB_PROVIDER", "demo"),
+                "provider": provider_names,
                 "found": found,
                 "new_local_jobs": inserted,
                 "evaluated": evaluated,
