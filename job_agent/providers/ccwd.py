@@ -191,7 +191,7 @@ class CCWDProvider(JobProvider):
         self._jobs = jobs
         return jobs
 
-    def search(self, role=None, location=None):
+    def search(self, role=None, location=None, **kwargs):
         jobs = self._load_jobs()
 
         tokens = [
