@@ -111,10 +111,12 @@ class CalaverasCountyProvider(JobProvider):
                 if salary_interval:
                     salary += f" per {salary_interval}"
 
-            location = (
-                self._job_text(item, "location")
-                or "Calaveras County, CA"
-            )
+            source_location = self._job_text(item, "location")
+
+            if source_location:
+                location = f"{source_location}, Calaveras County, CA"
+            else:
+                location = "Calaveras County, CA"
 
             # Important:
             #
