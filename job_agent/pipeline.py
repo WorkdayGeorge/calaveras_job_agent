@@ -100,7 +100,7 @@ def run_once(force: bool = False) -> dict:
 
         found = inserted = evaluated = alerts = 0
         now = datetime.now(timezone.utc)
-
+        processed_job_ids = set()
         try:
             for provider in providers:
                 for role in terms:
@@ -120,13 +120,17 @@ def run_once(force: bool = False) -> dict:
                         if is_new:
                             inserted += 1
     
-                        if evaluation_exists(session, job.id, RESUME_VERSION):
+                        if job.id in processed_job_ids:
                             continue
+
+                        if evaluation_exists(session, job.id, RESUME_VERSION):
+                            processed_job_ids.add(job.id)
+                            continue
+
+                        processed_job_ids.add(job.id)
     
                         job_dict = job_to_dict(job)
                         result = evaluate_job(job_dict, profile)
-                        evaluated += 1
-    
                         evaluation = Evaluation(
                             job_id=job.id,
                             resume_version=RESUME_VERSION,
@@ -143,8 +147,15 @@ def run_once(force: bool = False) -> dict:
                             evaluated_at=datetime.now(timezone.utc),
                         )
                         session.add(evaluation)
-                        session.commit()
-                        session.refresh(evaluation)
+
+                        try:
+                            session.commit()
+                            session.refresh(evaluation)
+                        except IntegrityError:
+                            session.rollback()
+                            continue
+
+                        evaluated += 1
     
                         bucket = notification_bucket(job_dict, result, settings)
                         if bucket != "silent":
@@ -181,6 +192,7 @@ def run_once(force: bool = False) -> dict:
             return summary
 
         except Exception as exc:
+            session.rollback()
             run.finished_at = datetime.now(timezone.utc)
             run.status = "error"
             run.found = found
