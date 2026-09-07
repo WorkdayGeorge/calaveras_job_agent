@@ -11,6 +11,7 @@ from .normalize import normalize_job
 from .notify import notification_bucket, console_notify, email_notify
 from .providers.demo import DemoProvider
 from .providers.adzuna import AdzunaProvider
+from .providers.calaveras_county import CalaverasCountyProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
     seed_settings, get_bool, get_int, enabled_terms
@@ -27,6 +28,8 @@ def get_providers():
     for name in names:
         if name == "adzuna":
             providers.append(AdzunaProvider())
+        elif name == "calaveras_county":
+            providers.append(CalaverasCountyProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:
