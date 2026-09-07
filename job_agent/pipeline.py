@@ -17,9 +17,9 @@ from .providers.commonspirit import CommonSpiritProvider
 from .providers.bear_valley import BearValleyProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
-from sqlalchemy.exc import IntegrityError
     seed_settings, get_bool, get_int, enabled_terms
 )
+from sqlalchemy.exc import IntegrityError
 
 RESUME_VERSION = "master-profile-v1"
 
