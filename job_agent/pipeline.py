@@ -14,6 +14,7 @@ from .providers.adzuna import AdzunaProvider
 from .providers.calaveras_county import CalaverasCountyProvider
 from .providers.calcareers import CalCareersProvider
 from .providers.commonspirit import CommonSpiritProvider
+from .providers.bear_valley import BearValleyProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
     seed_settings, get_bool, get_int, enabled_terms
@@ -36,6 +37,8 @@ def get_providers():
             providers.append(CalCareersProvider())
         elif name == "commonspirit":
             providers.append(CommonSpiritProvider())
+        elif name == "bear_valley":
+            providers.append(BearValleyProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:
