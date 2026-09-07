@@ -52,7 +52,11 @@ def health():
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {"error": None}
+    )
 
 @app.post("/login", response_class=HTMLResponse)
 def login(request: Request, password: str = Form(...)):
@@ -61,7 +65,10 @@ def login(request: Request, password: str = Form(...)):
         request.session["authenticated"] = True
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(
-        "login.html", {"request": request, "error": "Invalid password."}, status_code=401
+        request,
+        "login.html",
+        {"error": "Invalid password."},
+        status_code=401
     )
 
 @app.post("/logout")
@@ -89,14 +96,17 @@ def dashboard(request: Request):
             .limit(8)
         ).all()
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
-        "enabled": enabled,
-        "latest_run": latest_run,
-        "total_jobs": total_jobs,
-        "strong": strong,
-        "recent": recent,
-    })
+    return templates.TemplateResponse(
+        request,
+        "dashboard.html",
+        {
+            "enabled": enabled,
+            "latest_run": latest_run,
+            "total_jobs": total_jobs,
+            "strong": strong,
+            "recent": recent,
+        }
+    )
 
 @app.post("/admin/toggle")
 def toggle_agent(request: Request):
@@ -132,7 +142,9 @@ def settings_page(request: Request):
             ),
         }
     return templates.TemplateResponse(
-        "settings.html", {"request": request, "terms": terms, "values": values}
+        request,
+        "settings.html",
+        {"terms": terms, "values": values}
     )
 
 @app.post("/settings")
@@ -212,7 +224,9 @@ def jobs_page(request: Request, status: str | None = None):
             stmt = stmt.where(Job.status == status)
         rows = session.execute(stmt.limit(250)).all()
     return templates.TemplateResponse(
-        "jobs.html", {"request": request, "rows": rows, "status_filter": status}
+        request,
+        "jobs.html",
+        {"rows": rows, "status_filter": status}
     )
 
 @app.post("/jobs/{job_id}/status")
@@ -237,7 +251,11 @@ def runs_page(request: Request):
         return denial
     with SessionLocal() as session:
         runs = session.scalars(select(RunLog).order_by(desc(RunLog.started_at)).limit(100)).all()
-    return templates.TemplateResponse("runs.html", {"request": request, "runs": runs})
+    return templates.TemplateResponse(
+        request,
+        "runs.html",
+        {"runs": runs}
+    )
 
 @app.get("/resumes", response_class=HTMLResponse)
 def resumes_page(request: Request):
@@ -248,7 +266,11 @@ def resumes_page(request: Request):
         assets = session.scalars(
             select(ResumeAsset).order_by(desc(ResumeAsset.uploaded_at))
         ).all()
-    return templates.TemplateResponse("resumes.html", {"request": request, "assets": assets})
+    return templates.TemplateResponse(
+        request,
+        "resumes.html",
+        {"assets": assets}
+    )
 
 @app.post("/resumes/upload")
 async def upload_resume(
