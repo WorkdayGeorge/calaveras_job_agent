@@ -16,6 +16,7 @@ from .providers.calcareers import CalCareersProvider
 from .providers.commonspirit import CommonSpiritProvider
 from .providers.bear_valley import BearValleyProvider
 from .providers.ccwd import CCWDProvider
+from .providers.edjoin_calaveras import EDJoinCalaverasProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
     seed_settings, get_bool, get_int, enabled_terms
@@ -43,6 +44,8 @@ def get_providers():
             providers.append(BearValleyProvider())
         elif name == "ccwd":
             providers.append(CCWDProvider())
+        elif name == "edjoin_calaveras":
+            providers.append(EDJoinCalaverasProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:
