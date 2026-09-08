@@ -13,7 +13,7 @@
   <div class="card"><div class="muted">Agent status</div><div class="metric {% if enabled %}good{% else %}bad{% endif %}">{{ "RUNNING" if enabled else "PAUSED" }}</div></div>
   <div class="card"><div class="muted">Jobs stored</div><div class="metric">{{ total_jobs }}</div></div>
   <div class="card"><div class="muted">Strong evaluations</div><div class="metric">{{ strong }}</div></div>
-  <div class="card"><div class="muted">Last run</div><div class="metric" style="font-size:18px">{{ latest_run.status if latest_run else "Never" }}</div><div class="muted">{{ latest_run.started_at if latest_run else "" }}</div></div>
+  <div class="card"><div class="muted">Last run</div><div class="metric" style="font-size:18px">{{ latest_run.status if latest_run else "Never" }}</div><div class="muted">{{ latest_run.started_at|pacific_time if latest_run else "" }}</div></div>
 </div>
 
 <div class="card" style="margin-top:18px">

@@ -8,7 +8,7 @@
 {% for job, ev in rows %}
 <tr>
 <td><strong>{{ job.title }}</strong><br>{{ job.company }}<br><span class="muted">{{ job.location or "—" }}</span></td>
-<td>{{ job.posted_at or "Unverified" }}<br><span class="muted">{{ job.freshness_status }}</span></td>
+<td>{{ job.posted_at|pacific_time if job.posted_at else "Unverified" }}<br><span class="muted">{{ job.freshness_status }}</span></td>
 <td>{% if ev %}<strong>{{ ev.fit_score }}%</strong><br>{{ ev.classification }}<br><span class="muted">{{ ev.selected_resume }}</span>{% else %}—{% endif %}</td>
 <td>{% if ev %}{{ ev.recommendation }}<br><small>{{ ev.reasoning }}</small>{% else %}—{% endif %}</td>
 <td>

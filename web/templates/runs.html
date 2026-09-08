@@ -5,7 +5,7 @@
 <table>
 <tr><th>Started</th><th>Status</th><th>Provider</th><th>Found</th><th>New local</th><th>Evaluated</th><th>Alerts</th><th>Error</th></tr>
 {% for r in runs %}
-<tr><td>{{ r.started_at }}</td><td>{{ r.status }}</td><td>{{ r.provider or "—" }}</td><td>{{ r.found }}</td><td>{{ r.new_local_jobs }}</td><td>{{ r.evaluated }}</td><td>{{ r.alerts }}</td><td>{{ r.error or "" }}</td></tr>
+<tr><td>{{ r.started_at|pacific_time }}</td><td>{{ r.status }}</td><td>{{ r.provider or "—" }}</td><td>{{ r.found }}</td><td>{{ r.new_local_jobs }}</td><td>{{ r.evaluated }}</td><td>{{ r.alerts }}</td><td>{{ r.error or "" }}</td></tr>
 {% else %}<tr><td colspan="8">No runs yet.</td></tr>{% endfor %}
 </table>
 {% endblock %}

@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import secrets
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
@@ -24,6 +25,28 @@ from .resume_storage import save_resume
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+
+PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
+
+def pacific_time(value):
+    """Format a database timestamp for display in Pacific Time."""
+    if value is None:
+        return ""
+
+    # Some database drivers may return a naive datetime.
+    # Our stored timestamps are UTC, so assume UTC when tzinfo is absent.
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+
+    local = value.astimezone(PACIFIC_TZ)
+
+    return (
+        f"{local.strftime('%b')} {local.day}, {local.year} "
+        f"{local.strftime('%I:%M %p').lstrip('0')} "
+        f"{local.tzname()}"
+    )
+
+templates.env.filters["pacific_time"] = pacific_time
 
 app = FastAPI(title="Calaveras Job Agent")
 app.add_middleware(
