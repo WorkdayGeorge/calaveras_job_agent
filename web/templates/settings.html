@@ -4,6 +4,73 @@
 <h1>Agent Settings</h1>
 <div class="card">
 <form method="post" action="/settings">
+
+  <h2 style="margin-top:0">Search Schedule</h2>
+
+  <p class="muted">
+    Scheduled searches use Pacific Time. Run Search Now can be used at any time.
+  </p>
+
+  <div class="row">
+    <div>
+      <label>Run every</label>
+      <select name="schedule_interval_minutes">
+        {% for minutes in [5, 10, 15, 30, 60] %}
+        <option value="{{ minutes }}" {% if values.schedule_interval_minutes == minutes %}selected{% endif %}>
+          {{ minutes }} minutes
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Start time</label>
+      <input
+        type="time"
+        name="schedule_start_time"
+        value="{{ values.schedule_start_time }}"
+        step="300"
+        required
+      >
+    </div>
+
+    <div>
+      <label>Stop time</label>
+      <input
+        type="time"
+        name="schedule_stop_time"
+        value="{{ values.schedule_stop_time }}"
+        step="300"
+        required
+      >
+    </div>
+  </div>
+
+  <label style="margin-top:18px">Active days</label>
+  <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:8px; margin-bottom:22px">
+    {% for number, name in [
+        (0, "Monday"),
+        (1, "Tuesday"),
+        (2, "Wednesday"),
+        (3, "Thursday"),
+        (4, "Friday"),
+        (5, "Saturday"),
+        (6, "Sunday")
+    ] %}
+    <label>
+      <input
+        style="width:auto"
+        type="checkbox"
+        name="schedule_days"
+        value="{{ number }}"
+        {% if number in values.schedule_days %}checked{% endif %}
+      >
+      {{ name }}
+    </label>
+    {% endfor %}
+  </div>
+
+  <h2>Job Evaluation Settings</h2>
   <div class="row">
     <div><label>Fresh-job window (minutes)</label><input type="number" name="fresh_job_window_minutes" value="{{ values.fresh_job_window_minutes }}" min="1"></div>
     <div><label>Possible-fit threshold</label><input type="number" name="minimum_fit_score" value="{{ values.minimum_fit_score }}" min="0" max="100"></div>

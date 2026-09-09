@@ -12,6 +12,13 @@ DEFAULTS = {
     "minimum_fit_score": "60",
     "immediate_alert_score": "75",
     "allow_unverified_current_jobs_in_digest": "true",
+    "schedule_interval_minutes": "15",
+    "schedule_start_time": "09:00",
+    "schedule_stop_time": "17:00",
+    "schedule_days": "0,1,2,3,4",
+
+
+
 }
 
 def seed_settings(session: Session, yaml_settings: dict) -> None:

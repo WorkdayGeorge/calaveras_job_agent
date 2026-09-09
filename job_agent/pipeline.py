@@ -1,7 +1,8 @@
 \
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time
+from zoneinfo import ZoneInfo
 
 from .config import load_settings, env
 from .db import init_db, SessionLocal
@@ -19,7 +20,7 @@ from .providers.ccwd import CCWDProvider
 from .providers.edjoin_calaveras import EDJoinCalaverasProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
-    seed_settings, get_bool, get_int, enabled_terms
+    seed_settings, get_bool, get_int, get_setting, enabled_terms
 )
 from sqlalchemy.exc import IntegrityError
 
@@ -87,6 +88,54 @@ def _runtime_settings(session, yaml_settings: dict) -> dict:
     )
     return settings
 
+PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
+
+
+def scheduled_run_allowed(session) -> tuple[bool, str]:
+    """Return whether a scheduled search should run right now."""
+    now = datetime.now(PACIFIC_TZ)
+
+    days_raw = get_setting(session, "schedule_days", "0,1,2,3,4") or ""
+    try:
+        active_days = {
+            int(value)
+            for value in days_raw.split(",")
+            if value.strip()
+        }
+    except ValueError:
+        active_days = {0, 1, 2, 3, 4}
+
+    if now.weekday() not in active_days:
+        return False, "inactive day"
+
+    start_raw = get_setting(session, "schedule_start_time", "09:00") or "09:00"
+    stop_raw = get_setting(session, "schedule_stop_time", "17:00") or "17:00"
+
+    try:
+        start_time = time.fromisoformat(start_raw)
+        stop_time = time.fromisoformat(stop_raw)
+    except ValueError:
+        start_time = time(9, 0)
+        stop_time = time(17, 0)
+
+    current_time = now.time().replace(second=0, microsecond=0)
+
+    if current_time < start_time or current_time > stop_time:
+        return False, "outside active hours"
+
+    interval = get_int(session, "schedule_interval_minutes", 15)
+    if interval not in {5, 10, 15, 30, 60}:
+        interval = 15
+
+    start_minutes = start_time.hour * 60 + start_time.minute
+    current_minutes = now.hour * 60 + now.minute
+    minutes_since_start = current_minutes - start_minutes
+
+    if minutes_since_start % interval != 0:
+        return False, "not an interval boundary"
+
+    return True, "scheduled run allowed"
+
 def run_once(force: bool = False) -> dict:
     yaml_settings = load_settings()
     profile = load_candidate_profile()
@@ -99,6 +148,20 @@ def run_once(force: bool = False) -> dict:
             summary = {"status": "paused", "found": 0, "new_local_jobs": 0, "evaluated": 0, "alerts": 0}
             print("Run skipped: agent is paused.")
             return summary
+
+        if not force:
+            allowed, reason = scheduled_run_allowed(session)
+            if not allowed:
+                summary = {
+                    "status": "schedule_skipped",
+                    "reason": reason,
+                    "found": 0,
+                    "new_local_jobs": 0,
+                    "evaluated": 0,
+                    "alerts": 0,
+                }
+                print(f"Run skipped: {reason}.")
+                return summary
 
         settings = _runtime_settings(session, yaml_settings)
         terms = enabled_terms(session)

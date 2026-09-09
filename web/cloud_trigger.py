@@ -20,5 +20,25 @@ def trigger_worker() -> str:
     name = f"projects/{project}/locations/{region}/jobs/{job_name}"
 
     client = run_v2.JobsClient()
-    operation = client.run_job(name=name)
+
+    overrides = run_v2.RunJobRequest.Overrides(
+        container_overrides=[
+            run_v2.RunJobRequest.Overrides.ContainerOverride(
+                env=[
+                    run_v2.EnvVar(
+                        name="FORCE_RUN",
+                        value="true",
+                    )
+                ]
+            )
+        ]
+    )
+
+    request = run_v2.RunJobRequest(
+        name=name,
+        overrides=overrides,
+    )
+
+    operation = client.run_job(request=request)
+
     return f"Cloud Run Job triggered: {name}; operation={operation.operation.name}"

@@ -18,8 +18,12 @@ from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset
 from job_agent.config import load_settings, env
 from job_agent.notify import email_notify
 from job_agent.settings_store import (
-    seed_settings, get_bool, get_int, set_setting
+    seed_settings, get_bool, get_int, get_setting, set_setting
 )
+
+
+
+
 from .cloud_trigger import trigger_worker
 from .resume_storage import save_resume
 
@@ -234,8 +238,24 @@ def settings_page(request: Request):
             "minimum_fit_score": get_int(session, "minimum_fit_score", 60),
             "immediate_alert_score": get_int(session, "immediate_alert_score", 75),
             "allow_unverified_current_jobs_in_digest": get_bool(
-                session, "allow_unverified_current_jobs_in_digest", True
+                 session, "allow_unverified_current_jobs_in_digest", True
             ),
+            "schedule_interval_minutes": get_int(
+                 session, "schedule_interval_minutes", 15
+            ),
+            "schedule_start_time": get_setting(
+                 session, "schedule_start_time", "09:00"
+            ),
+            "schedule_stop_time": get_setting(
+                 session, "schedule_stop_time", "17:00"
+            ),
+            "schedule_days": {
+                 int(day)
+                 for day in (
+                     get_setting(session, "schedule_days", "0,1,2,3,4") or ""
+                 ).split(",")
+                 if day.strip().isdigit()
+            },
         }
     return templates.TemplateResponse(
         request,
@@ -249,15 +269,80 @@ def save_settings(
     fresh_job_window_minutes: int = Form(...),
     minimum_fit_score: int = Form(...),
     immediate_alert_score: int = Form(...),
+    schedule_interval_minutes: int = Form(...),
+    schedule_start_time: str = Form(...),
+    schedule_stop_time: str = Form(...),
+    schedule_days: list[str] = Form([]),
     allow_unverified_current_jobs_in_digest: str | None = Form(None),
+
+
+
+
+
+
+
 ):
     denial = require_auth(request)
     if denial:
         return denial
     with SessionLocal() as session:
-        set_setting(session, "fresh_job_window_minutes", str(max(1, fresh_job_window_minutes)))
-        set_setting(session, "minimum_fit_score", str(max(0, min(100, minimum_fit_score))))
-        set_setting(session, "immediate_alert_score", str(max(0, min(100, immediate_alert_score))))
+        set_setting(
+            session,
+            "fresh_job_window_minutes",
+            str(max(1, fresh_job_window_minutes)),
+        )
+        set_setting(
+            session,
+            "minimum_fit_score",
+            str(max(0, min(100, minimum_fit_score))),
+        )
+        set_setting(
+            session,
+            "immediate_alert_score",
+            str(max(0, min(100, immediate_alert_score))),
+        )
+
+        allowed_intervals = {5, 10, 15, 30, 60}
+        if schedule_interval_minutes not in allowed_intervals:
+            schedule_interval_minutes = 15
+
+        try:
+            datetime.strptime(schedule_start_time, "%H:%M")
+        except ValueError:
+            schedule_start_time = "09:00"
+
+        try:
+            datetime.strptime(schedule_stop_time, "%H:%M")
+        except ValueError:
+            schedule_stop_time = "17:00"
+
+        valid_days = sorted({
+            int(day)
+            for day in schedule_days
+            if day.isdigit() and 0 <= int(day) <= 6
+        })
+
+        set_setting(
+            session,
+            "schedule_interval_minutes",
+            str(schedule_interval_minutes),
+        )
+        set_setting(
+            session,
+            "schedule_start_time",
+            schedule_start_time,
+        )
+        set_setting(
+            session,
+            "schedule_stop_time",
+            schedule_stop_time,
+        )
+        set_setting(
+            session,
+            "schedule_days",
+            ",".join(str(day) for day in valid_days),
+        )
+
         set_setting(
             session,
             "allow_unverified_current_jobs_in_digest",
