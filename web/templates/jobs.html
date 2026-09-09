@@ -3,6 +3,22 @@
 {% block content %}
 <h1>Jobs</h1>
 <p class="muted">Track each opportunity from discovery through application.</p>
+<form method="get" action="/jobs" style="margin-bottom:18px">
+  {% if status_filter %}
+  <input type="hidden" name="status" value="{{ status_filter }}">
+  {% endif %}
+
+  <label for="sort"><span class="muted">Sort by</span></label>
+  <select id="sort" name="sort" onchange="this.form.submit()">
+    <option value="newest_posted" {% if sort_by == "newest_posted" %}selected{% endif %}>Newest posting</option>
+    <option value="oldest_posted" {% if sort_by == "oldest_posted" %}selected{% endif %}>Oldest posting</option>
+    <option value="newest_found" {% if sort_by == "newest_found" %}selected{% endif %}>Newest found</option>
+    <option value="highest_fit" {% if sort_by == "highest_fit" %}selected{% endif %}>Highest fit</option>
+    <option value="lowest_fit" {% if sort_by == "lowest_fit" %}selected{% endif %}>Lowest fit</option>
+    <option value="title" {% if sort_by == "title" %}selected{% endif %}>Job title A-Z</option>
+    <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
+  </select>
+</form>
 <table>
 <tr><th>Job</th><th>Posted</th><th>Fit</th><th>Recommendation</th><th>Status</th><th>Apply</th></tr>
 {% for job, ev in rows %}

@@ -48,6 +48,39 @@ def pacific_time(value):
 
 templates.env.filters["pacific_time"] = pacific_time
 
+def job_sort_order(sort_by):
+    """Return SQLAlchemy ORDER BY expressions for job listings."""
+    if sort_by == "oldest_posted":
+        return (
+            Job.posted_at.is_(None),
+            Job.posted_at.asc(),
+            Job.first_seen_at.desc(),
+        )
+    if sort_by == "newest_found":
+        return (Job.first_seen_at.desc(),)
+    if sort_by == "highest_fit":
+        return (
+            Evaluation.fit_score.desc().nullslast(),
+            Job.posted_at.desc().nullslast(),
+        )
+    if sort_by == "lowest_fit":
+        return (
+            Evaluation.fit_score.asc().nullslast(),
+            Job.posted_at.desc().nullslast(),
+        )
+    if sort_by == "title":
+        return (Job.title.asc(),)
+    if sort_by == "company":
+        return (Job.company.asc(),)
+
+    # Default: newest verified posting first.
+    # Jobs without a verified posting time appear afterward.
+    return (
+        Job.posted_at.is_(None),
+        Job.posted_at.desc(),
+        Job.first_seen_at.desc(),
+    )
+
 app = FastAPI(title="Calaveras Job Agent")
 app.add_middleware(
     SessionMiddleware,
@@ -101,7 +134,7 @@ def logout(request: Request):
     return RedirectResponse("/login", status_code=303)
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request):
+def dashboard(request: Request, sort: str = "newest_posted"):
     denial = require_auth(request)
     if denial:
         return denial
@@ -116,7 +149,7 @@ def dashboard(request: Request):
         recent = session.execute(
             select(Job, Evaluation)
             .join(Evaluation, Evaluation.job_id == Job.id, isouter=True)
-            .order_by(desc(Job.first_seen_at))
+            .order_by(*job_sort_order(sort))
             .limit(8)
         ).all()
 
@@ -129,6 +162,7 @@ def dashboard(request: Request):
             "total_jobs": total_jobs,
             "strong": strong,
             "recent": recent,
+            "sort_by": sort,
         }
     )
 
@@ -272,7 +306,11 @@ def delete_term(term_id: str, request: Request):
     return RedirectResponse("/settings", status_code=303)
 
 @app.get("/jobs", response_class=HTMLResponse)
-def jobs_page(request: Request, status: str | None = None):
+def jobs_page(
+    request: Request,
+    status: str | None = None,
+    sort: str = "newest_posted",
+):
     denial = require_auth(request)
     if denial:
         return denial
@@ -280,7 +318,7 @@ def jobs_page(request: Request, status: str | None = None):
         stmt = (
             select(Job, Evaluation)
             .join(Evaluation, Evaluation.job_id == Job.id, isouter=True)
-            .order_by(desc(Job.first_seen_at))
+            .order_by(*job_sort_order(sort))
         )
         if status:
             stmt = stmt.where(Job.status == status)
@@ -288,7 +326,7 @@ def jobs_page(request: Request, status: str | None = None):
     return templates.TemplateResponse(
         request,
         "jobs.html",
-        {"rows": rows, "status_filter": status}
+        {"rows": rows, "status_filter": status, "sort_by": sort}
     )
 
 @app.post("/jobs/{job_id}/status")

@@ -28,7 +28,22 @@
   </form>
 </div>
 
-<h2>Recent jobs</h2>
+<div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:18px">
+  <h2 style="margin:0">Jobs</h2>
+
+  <form method="get" action="/" class="inline">
+    <label for="sort"><span class="muted">Sort by</span></label>
+    <select id="sort" name="sort" onchange="this.form.submit()">
+      <option value="newest_posted" {% if sort_by == "newest_posted" %}selected{% endif %}>Newest posting</option>
+      <option value="oldest_posted" {% if sort_by == "oldest_posted" %}selected{% endif %}>Oldest posting</option>
+      <option value="newest_found" {% if sort_by == "newest_found" %}selected{% endif %}>Newest found</option>
+      <option value="highest_fit" {% if sort_by == "highest_fit" %}selected{% endif %}>Highest fit</option>
+      <option value="lowest_fit" {% if sort_by == "lowest_fit" %}selected{% endif %}>Lowest fit</option>
+      <option value="title" {% if sort_by == "title" %}selected{% endif %}>Job title A-Z</option>
+      <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
+    </select>
+  </form>
+</div>
 <table>
 <tr><th>Job</th><th>Location</th><th>Freshness</th><th>Fit</th><th>Status</th></tr>
 {% for job, ev in recent %}
