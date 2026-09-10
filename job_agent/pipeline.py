@@ -180,14 +180,23 @@ def run_once(force: bool = False) -> dict:
         found = inserted = evaluated = alerts = 0
         now = datetime.now(timezone.utc)
         processed_job_ids = set()
+        provider_errors = []
         try:
             for provider in providers:
+                provider_name = type(provider).__name__.replace("Provider", "")
                 for role in terms:
-                    raw_jobs = provider.search(
-                        role=role,
-                        location=settings["location"]["primary"],
-                        results_per_page=25,
-                    )
+                    try:
+                        raw_jobs = provider.search(
+                            role=role,
+                            location=settings["location"]["primary"],
+                            results_per_page=25,
+                        )
+                    except Exception as exc:
+                        message = f"{provider_name} search failed for {role!r}: {exc}"
+                        provider_errors.append(message)
+                        print(message)
+                        continue
+
                     found += len(raw_jobs)
 
                     for raw in raw_jobs:
@@ -252,20 +261,22 @@ def run_once(force: bool = False) -> dict:
                             session.commit()
 
             run.finished_at = datetime.now(timezone.utc)
-            run.status = "success"
+            run.status = "partial" if provider_errors else "success"
             run.found = found
             run.new_local_jobs = inserted
             run.evaluated = evaluated
             run.alerts = alerts
+            run.error = "\n".join(provider_errors) if provider_errors else None
             session.commit()
 
             summary = {
-                "status": "success",
+                "status": run.status,
                 "provider": provider_names,
                 "found": found,
                 "new_local_jobs": inserted,
                 "evaluated": evaluated,
                 "alerts": alerts,
+                "provider_errors": provider_errors,
             }
             print("\nRun summary:", summary)
             return summary
