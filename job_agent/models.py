@@ -106,3 +106,59 @@ class ResumeAsset(Base):
     storage_uri: Mapped[str] = mapped_column(Text, nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
+
+class ApplicationPackage(Base):
+    __tablename__ = "application_packages"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "version",
+            name="uq_application_package_job_version",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=uuid_str,
+    )
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("jobs.id"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
+    tailored_resume: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    cover_letter: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    interview_questions: Mapped[list] = mapped_column(
+        JSON,
+        default=list,
+    )
+
+    job_description_snapshot: Mapped[str | None] = mapped_column(Text)
+    generation_model: Mapped[str | None] = mapped_column(String(100))
+    truth_check_notes: Mapped[list] = mapped_column(
+        JSON,
+        default=list,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+

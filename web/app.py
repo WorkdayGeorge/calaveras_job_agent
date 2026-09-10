@@ -14,7 +14,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import select, desc, func
 
 from job_agent.db import init_db, SessionLocal
-from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset
+from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage
+from job_agent.application_builder import build_application_materials
 from job_agent.config import load_settings, env
 from job_agent.notify import email_notify
 from job_agent.settings_store import (
@@ -428,6 +429,88 @@ def set_job_status(job_id: str, request: Request, status: str = Form(...)):
             job.status = status
             session.commit()
     return RedirectResponse("/jobs", status_code=303)
+
+@app.get("/jobs/{job_id}/application", response_class=HTMLResponse)
+def application_page(job_id: str, request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+
+    with SessionLocal() as session:
+        job = session.get(Job, job_id)
+        if not job:
+            return HTMLResponse("Job not found", status_code=404)
+
+        package = session.scalar(
+            select(ApplicationPackage)
+            .where(ApplicationPackage.job_id == job_id)
+            .order_by(desc(ApplicationPackage.version))
+            .limit(1)
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "application.html",
+        {"job": job, "package": package}
+    )
+
+
+
+@app.post("/jobs/{job_id}/application/build")
+def build_application_package(job_id: str, request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+
+    with SessionLocal() as session:
+        job = session.get(Job, job_id)
+        if not job:
+            return HTMLResponse("Job not found", status_code=404)
+
+        job_data = {
+            "title": job.title,
+            "company": job.company,
+            "location": job.location,
+            "employment_type": job.employment_type,
+            "description": job.description,
+            "requirements": job.requirements or [],
+            "source": job.source,
+        }
+
+        try:
+            result = build_application_materials(job_data)
+        except Exception:
+            return HTMLResponse(
+                "Application package generation failed. Please try again.",
+                status_code=500,
+            )
+
+        current_version = session.scalar(
+            select(func.max(ApplicationPackage.version))
+            .where(ApplicationPackage.job_id == job_id)
+        ) or 0
+
+        now = datetime.now(timezone.utc)
+        package = ApplicationPackage(
+            job_id=job_id,
+            version=current_version + 1,
+            tailored_resume=result["tailored_resume"],
+            cover_letter=result["cover_letter"],
+            interview_questions=result["interview_questions"],
+            job_description_snapshot=job.description,
+            generation_model=env("OPENAI_MODEL", "gpt-5.6-luna"),
+            truth_check_notes=result["truth_check_notes"],
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(package)
+        session.commit()
+
+    return RedirectResponse(
+        f"/jobs/{job_id}/application",
+        status_code=303,
+    )
+
 
 @app.get("/runs", response_class=HTMLResponse)
 def runs_page(request: Request):

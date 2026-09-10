@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="row" style="align-items:center; margin-bottom:18px;">
+  <div>
+    <h1 style="margin-bottom:6px;">Application Prep</h1>
+    <div class="muted">
+      {{ job.title }} &mdash; {{ job.company }}
+      {% if job.location %}&mdash; {{ job.location }}{% endif %}
+    </div>
+  </div>
+  <div style="flex:0 0 auto;">
+    <a class="btn secondary" href="/jobs">Back to Jobs</a>
+    <a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener">Open Job Posting</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Job</h2>
+  <strong>{{ job.title }}</strong><br>
+  <span>{{ job.company }}</span>
+  {% if job.location %}
+    <div class="muted" style="margin-top:4px;">{{ job.location }}</div>
+  {% endif %}
+  {% if job.description %}
+    <h3>Job Description</h3>
+    <div style="white-space:pre-wrap;">{{ job.description }}</div>
+  {% endif %}
+</div>
+
+{% if not package %}
+<div class="card" style="margin-top:18px;">
+  <h2 style="margin-top:0;">Application Package</h2>
+  <p class="muted">No tailored application package has been generated for this job yet.</p>
+  <form method="post" action="/jobs/{{ job.id }}/application/build"><button class="btn good" type="submit">Generate Application Package</button></form>
+</div>
+{% else %}
+<div class="card" style="margin-top:18px;">
+  <form method="post" action="/jobs/{{ job.id }}/application/build" style="margin-bottom:12px;"><button class="btn good" type="submit">Regenerate / New Version</button></form>
+  <h2 style="margin-top:0;">Tailored Resume</h2>
+  <div class="muted">
+    Version {{ package.version }}
+    {% if package.created_at %}&mdash; {{ package.created_at | pacific_time }}{% endif %}
+  </div>
+  <div style="white-space:pre-wrap; margin-top:18px;">{{ package.tailored_resume }}</div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h2 style="margin-top:0;">Cover Letter</h2>
+  <div style="white-space:pre-wrap;">{{ package.cover_letter }}</div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h2 style="margin-top:0;">Potential Interview Questions</h2>
+  {% if package.interview_questions %}
+    <ol>
+      {% for q in package.interview_questions %}
+        <li style="margin-bottom:12px;">
+          {% if q is mapping %}
+            <strong>{{ q.get("question", "") }}</strong>
+            {% if q.get("talking_points") %}
+              <div class="muted" style="margin-top:4px;">{{ q.get("talking_points") }}</div>
+            {% endif %}
+          {% else %}
+            {{ q }}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <p class="muted">No interview questions stored.</p>
+  {% endif %}
+</div>
+
+{% if package.truth_check_notes %}
+<div class="card" style="margin-top:18px;">
+  <h2 style="margin-top:0;">Truth Check</h2>
+  <ul>
+    {% for note in package.truth_check_notes %}
+      <li>{{ note }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endif %}
+
+{% endblock %}
