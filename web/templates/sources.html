@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Job Sources</h1>
+<p class="muted">Job sites and providers referenced by the agent.</p>
+<table>
+  <thead>
+    <tr><th>Source</th><th>Type</th><th>Description</th><th>Links</th></tr>
+  </thead>
+  <tbody>
+  {% for source in sources %}
+    <tr>
+      <td><strong>{{ source.name }}</strong></td>
+      <td>{{ source.type }}</td>
+      
+      <td>{{ source.description }}</td>
+      <td>{% for link in source.links %}<a class="btn secondary" href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a>{% endfor %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

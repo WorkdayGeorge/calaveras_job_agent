@@ -16,6 +16,7 @@ from sqlalchemy import select, desc, func
 from job_agent.db import init_db, SessionLocal
 from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage
 from job_agent.application_builder import build_application_materials
+from job_agent.source_catalog import get_job_sources
 from job_agent.config import load_settings, env
 from job_agent.notify import email_notify
 from job_agent.settings_store import (
@@ -509,6 +510,20 @@ def build_application_package(job_id: str, request: Request):
     return RedirectResponse(
         f"/jobs/{job_id}/application",
         status_code=303,
+    )
+
+
+@app.get("/sources", response_class=HTMLResponse)
+def sources_page(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+
+    sources = get_job_sources()
+    return templates.TemplateResponse(
+        request,
+        "sources.html",
+        {"sources": sources},
     )
 
 
