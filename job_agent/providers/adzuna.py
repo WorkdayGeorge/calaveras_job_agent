@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import time
 import requests
 
 from .base import JobProvider
@@ -27,8 +28,32 @@ class AdzunaProvider(JobProvider):
             "sort_by": "date",
             "content-type": "application/json",
         }
-        response = requests.get(self.BASE_URL, params=params, timeout=30)
-        response.raise_for_status()
+        retry_statuses = {429, 500, 502, 503, 504}
+        response = None
+
+        for attempt in range(3):
+            try:
+                response = requests.get(self.BASE_URL, params=params, timeout=30)
+            except requests.RequestException:
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise RuntimeError("Adzuna request failed after retries") from None
+
+            if response.status_code in retry_statuses and attempt < 2:
+                time.sleep(2 ** attempt)
+                continue
+
+            if not response.ok:
+                raise RuntimeError(
+                    f"Adzuna request failed with HTTP {response.status_code}"
+                )
+
+            break
+
+        if response is None:
+            raise RuntimeError("Adzuna request failed after retries")
+
         payload = response.json()
 
         jobs: list[RawJob] = []
