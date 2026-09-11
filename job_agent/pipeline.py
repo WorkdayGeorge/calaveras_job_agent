@@ -7,9 +7,9 @@ from zoneinfo import ZoneInfo
 from .config import load_settings, env
 from .db import init_db, SessionLocal
 from .evaluator import load_candidate_profile, evaluate_job
-from .models import Evaluation, Notification, RunLog
+from .models import Job, Evaluation, Notification, RunLog
 from .normalize import normalize_job
-from .notify import notification_bucket, console_notify, email_notify
+from .notify import notification_bucket, console_notify, email_notify, email_high_priority_digest
 from .providers.demo import DemoProvider
 from .providers.adzuna import AdzunaProvider
 from .providers.calaveras_county import CalaverasCountyProvider
@@ -20,8 +20,9 @@ from .providers.ccwd import CCWDProvider
 from .providers.edjoin_calaveras import EDJoinCalaverasProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
-    seed_settings, get_bool, get_int, get_setting, enabled_terms
+    seed_settings, get_bool, get_int, get_setting, set_setting, enabled_terms
 )
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 RESUME_VERSION = "master-profile-v1"
@@ -136,6 +137,61 @@ def scheduled_run_allowed(session) -> tuple[bool, str]:
 
     return True, "scheduled run allowed"
 
+def process_high_priority_digest(session) -> dict:
+    """Send the daily high-priority digest once per Pacific calendar day."""
+    now_pt = datetime.now(PACIFIC_TZ)
+    today = now_pt.date().isoformat()
+
+    digest_time_raw = get_setting(session, "high_priority_digest_time", "17:05") or "17:05"
+    try:
+        digest_time = time.fromisoformat(digest_time_raw)
+    except ValueError:
+        digest_time = time(17, 5)
+
+    if now_pt.time().replace(second=0, microsecond=0) < digest_time:
+        return {"status": "not_due"}
+
+    last_date = get_setting(session, "high_priority_digest_last_date", "") or ""
+    if last_date == today:
+        return {"status": "already_processed"}
+
+    rows = session.execute(
+        select(Notification, Job, Evaluation)
+        .join(Job, Notification.job_id == Job.id)
+        .join(Evaluation, Notification.evaluation_id == Evaluation.id)
+        .where(Notification.status == "pending_digest")
+        .order_by(Evaluation.fit_score.desc(), Job.first_seen_at.desc())
+    ).all()
+
+    if not rows:
+        set_setting(session, "high_priority_digest_last_date", today)
+        return {"status": "no items", "count": 0}
+
+    items = []
+    for notification, job, evaluation in rows:
+        items.append((job_to_dict(job), {
+            "fit_score": evaluation.fit_score,
+            "classification": evaluation.classification,
+            "recommendation": evaluation.recommendation,
+        }))
+
+    sent, detail = email_high_priority_digest(items)
+    if not sent:
+        print(f"High-priority digest send failed: {detail}")
+        return {"status": "failed", "detail": detail}
+
+    sent_at = datetime.now(timezone.utc)
+    for notification, _, _ in rows:
+        notification.status = "sent"
+        notification.channel = "digest"
+        notification.sent_at = sent_at
+        notification.detail = "Sent in daily high-priority digest"
+
+    set_setting(session, "high_priority_digest_last_date", today)
+    session.commit()
+    print(f"High-priority digest sent: {len(rows)} job(s).")
+    return {"status": "sent", "count": len(rows)}
+
 def run_once(force: bool = False) -> dict:
     yaml_settings = load_settings()
     profile = load_candidate_profile()
@@ -160,6 +216,7 @@ def run_once(force: bool = False) -> dict:
                     "evaluated": 0,
                     "alerts": 0,
                 }
+                digest_result = process_high_priority_digest(session)
                 print(f"Run skipped: {reason}.")
                 return summary
 
@@ -246,7 +303,17 @@ def run_once(force: bool = False) -> dict:
                         evaluated += 1
     
                         bucket = notification_bucket(job_dict, result, settings)
-                        if bucket != "silent":
+                        if bucket == "high_priority_digest":
+                            session.add(Notification(
+                                job_id=job.id,
+                                evaluation_id=evaluation.id,
+                                channel="digest",
+                                sent_at=datetime.now(timezone.utc),
+                                status="pending_digest",
+                                detail="Queued for daily high-priority digest",
+                            ))
+                            session.commit()
+                        elif bucket != "silent":
                             alerts += 1
                             console_notify(job_dict, result, bucket)
                             sent, detail = email_notify(job_dict, result, bucket)
@@ -268,6 +335,8 @@ def run_once(force: bool = False) -> dict:
             run.alerts = alerts
             run.error = "\n".join(provider_errors) if provider_errors else None
             session.commit()
+
+            digest_result = process_high_priority_digest(session)
 
             summary = {
                 "status": run.status,

@@ -44,7 +44,22 @@
         required
       >
     </div>
+
+    <div>
+      <label>High-priority digest time</label>
+      <input
+        type="time"
+        name="high_priority_digest_time"
+        value="{{ values.high_priority_digest_time }}"
+        step="300"
+        required
+      >
+    </div>
   </div>
+
+  <p class="muted">
+    Strong-fit jobs with unverified posting times are held and sent once per day at the digest time above.
+  </p>
 
   <label style="margin-top:18px">Active days</label>
   <div style="display:flex; flex-wrap:wrap; gap:16px; margin-top:8px; margin-bottom:22px">

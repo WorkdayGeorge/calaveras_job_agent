@@ -15,6 +15,7 @@ DEFAULTS = {
     "schedule_interval_minutes": "15",
     "schedule_start_time": "09:00",
     "schedule_stop_time": "17:00",
+    "high_priority_digest_time": "17:05",
     "schedule_days": "0,1,2,3,4",
 
 

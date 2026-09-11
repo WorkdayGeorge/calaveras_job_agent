@@ -251,6 +251,9 @@ def settings_page(request: Request):
             "schedule_stop_time": get_setting(
                  session, "schedule_stop_time", "17:00"
             ),
+            "high_priority_digest_time": get_setting(
+                 session, "high_priority_digest_time", "17:05"
+            ),
             "schedule_days": {
                  int(day)
                  for day in (
@@ -274,6 +277,7 @@ def save_settings(
     schedule_interval_minutes: int = Form(...),
     schedule_start_time: str = Form(...),
     schedule_stop_time: str = Form(...),
+    high_priority_digest_time: str = Form(...),
     schedule_days: list[str] = Form([]),
     allow_unverified_current_jobs_in_digest: str | None = Form(None),
 
@@ -317,6 +321,17 @@ def save_settings(
             datetime.strptime(schedule_stop_time, "%H:%M")
         except ValueError:
             schedule_stop_time = "17:00"
+
+        try:
+            datetime.strptime(high_priority_digest_time, "%H:%M")
+        except ValueError:
+            high_priority_digest_time = "17:05"
+
+        set_setting(
+            session,
+            "high_priority_digest_time",
+            high_priority_digest_time,
+        )
 
         valid_days = sorted({
             int(day)

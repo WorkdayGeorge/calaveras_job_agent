@@ -86,3 +86,53 @@ def email_notify(job: dict, evaluation: dict, bucket: str) -> tuple[bool, str]:
         return True, "sent"
     except Exception as exc:
         return False, str(exc)
+
+def email_high_priority_digest(items: list[tuple[dict, dict]]) -> tuple[bool, str]:
+    if not items:
+        return False, "no pending digest items"
+
+    if str(env("SMTP_ENABLED", "false")).lower() not in {"1", "true", "yes", "on"}:
+        return False, "SMTP disabled"
+
+    host = env("SMTP_HOST")
+    port = int(env("SMTP_PORT", "587"))
+    username = env("SMTP_USERNAME")
+    password = env("SMTP_PASSWORD")
+    to_addr = env("ALERT_EMAIL_TO")
+    from_addr = env("ALERT_EMAIL_FROM") or username
+
+    if not all([host, username, password, to_addr, from_addr]):
+        return False, "SMTP settings incomplete"
+
+    lines = [
+        "High-Priority Daily Job Digest",
+        "",
+        f"These {len(items)} strong-fit job(s) had an unverified posting time and were held for the daily digest.",
+        "",
+    ]
+
+    for index, (job, evaluation) in enumerate(items, start=1):
+        lines.extend([
+            f"{index}. {job['title']}",
+            job["company"],
+            job.get("location") or "Location not supplied",
+            f"Fit: {evaluation['fit_score']}/100 — {evaluation['classification']}",
+            f"Recommendation: {evaluation['recommendation']}",
+            f"Apply: {job['apply_url']}",
+            "",
+        ])
+
+    msg = EmailMessage()
+    msg["Subject"] = f"High-Priority Job Digest — {len(items)} job(s)"
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg.set_content("\n".join(lines))
+
+    try:
+        with smtplib.SMTP(host, port, timeout=30) as smtp:
+            smtp.starttls()
+            smtp.login(username, password)
+            smtp.send_message(msg)
+        return True, "sent"
+    except Exception as exc:
+        return False, str(exc)
