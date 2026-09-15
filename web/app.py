@@ -6,6 +6,7 @@ import secrets
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -18,7 +19,11 @@ from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset, A
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
 from job_agent.config import load_settings, env
-from job_agent.notify import email_notify, normalize_email_address
+from job_agent.notify import (
+    email_notify,
+    normalize_email_address,
+    normalize_us_phone,
+)
 from job_agent.settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting
 )
@@ -222,16 +227,27 @@ def test_email(request: Request):
             )
             or env("ALERT_EMAIL_TO", "")
         )
+        sms_phone_number = (
+            get_setting(session, "sms_phone_number", "") or ""
+        )
 
     sent, result = email_notify(
         test_job,
         test_evaluation,
         "test",
         recipient=recipient,
+        sms_phone_number=sms_phone_number,
     )
 
     if sent:
-        return RedirectResponse("/?message=Test+email+sent", status_code=303)
+        if "Verizon text sent" in result:
+            message = "Test email and Verizon text sent"
+        else:
+            message = f"Test email sent; {result}"
+        return RedirectResponse(
+            f"/?message={quote_plus(message)}",
+            status_code=303,
+        )
 
     return RedirectResponse(
         f"/?message=Test+email+failed:+{result}",
@@ -280,6 +296,9 @@ def settings_page(request: Request):
                 )
                 or env("ALERT_EMAIL_TO", "")
             ),
+            "sms_phone_number": (
+                get_setting(session, "sms_phone_number", "") or ""
+            ),
         }
     return templates.TemplateResponse(
         request,
@@ -300,6 +319,7 @@ def save_settings(
     schedule_days: list[str] = Form([]),
     allow_unverified_current_jobs_in_digest: str | None = Form(None),
     alert_email_to: str = Form(""),
+    sms_phone_number: str = Form(""),
 ):
     denial = require_auth(request)
     if denial:
@@ -315,8 +335,16 @@ def save_settings(
             "/settings?message=Enter+a+valid+single+email+address",
             status_code=303,
         )
+    phone_input = sms_phone_number.strip()
+    validated_phone = normalize_us_phone(phone_input) if phone_input else ""
+    if phone_input and not validated_phone:
+        return RedirectResponse(
+            "/settings?message=Enter+a+valid+10-digit+Verizon+mobile+number",
+            status_code=303,
+        )
     with SessionLocal() as session:
         set_setting(session, "alert_email_to", validated_recipient)
+        set_setting(session, "sms_phone_number", validated_phone)
         set_setting(
             session,
             "fresh_job_window_minutes",

@@ -1,4 +1,8 @@
-from job_agent.notify import email_notify, normalize_email_address
+from job_agent.notify import (
+    email_notify,
+    normalize_email_address,
+    normalize_us_phone,
+)
 
 
 def test_normalize_email_address_accepts_single_address():
@@ -14,8 +18,14 @@ def test_normalize_email_address_rejects_incomplete_address():
     assert normalize_email_address("jobs@example") is None
 
 
+def test_normalize_us_phone():
+    assert normalize_us_phone("(925) 555-1234") == "9255551234"
+    assert normalize_us_phone("+1 925 555 1234") == "9255551234"
+    assert normalize_us_phone("555-1234") is None
+
+
 def test_email_notify_uses_settings_recipient_over_environment(monkeypatch):
-    sent = {}
+    sent = []
 
     class SMTP:
         def __init__(self, host, port, timeout):
@@ -34,7 +44,7 @@ def test_email_notify_uses_settings_recipient_over_environment(monkeypatch):
             pass
 
         def send_message(self, message):
-            sent["to"] = message["To"]
+            sent.append(message["To"])
 
     monkeypatch.setenv("SMTP_ENABLED", "true")
     monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
@@ -61,7 +71,8 @@ def test_email_notify_uses_settings_recipient_over_environment(monkeypatch):
         },
         "test",
         recipient="new@example.com",
+        sms_phone_number="925-555-1234",
     )
 
     assert success is True
-    assert sent["to"] == "new@example.com"
+    assert sent == ["new@example.com", "9255551234@vtext.com"]

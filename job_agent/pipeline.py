@@ -106,6 +106,9 @@ def _runtime_settings(session, yaml_settings: dict) -> dict:
         get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
         or env("ALERT_EMAIL_TO", "")
     )
+    settings["sms_phone_number"] = (
+        get_setting(session, "sms_phone_number", "") or ""
+    )
     return settings
 
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
@@ -198,7 +201,12 @@ def process_high_priority_digest(session) -> dict:
         get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
         or env("ALERT_EMAIL_TO", "")
     )
-    sent, detail = email_high_priority_digest(items, recipient=recipient)
+    sms_phone_number = get_setting(session, "sms_phone_number", "") or ""
+    sent, detail = email_high_priority_digest(
+        items,
+        recipient=recipient,
+        sms_phone_number=sms_phone_number,
+    )
     if not sent:
         print(f"High-priority digest send failed: {detail}")
         return {"status": "failed", "detail": detail}
@@ -359,6 +367,9 @@ def run_once(force: bool = False) -> dict:
                                 result,
                                 bucket,
                                 recipient=settings.get("alert_email_to"),
+                                sms_phone_number=settings.get(
+                                    "sms_phone_number"
+                                ),
                             )
                             session.add(Notification(
                                 job_id=job.id,
