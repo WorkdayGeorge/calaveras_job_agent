@@ -90,7 +90,9 @@ class RunLog(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status: Mapped[str] = mapped_column(String(30), default="running")
-    provider: Mapped[str | None] = mapped_column(String(100))
+    # This is a comma-separated audit label for every provider in a run. Text
+    # avoids a deployment failure as the configured provider set grows.
+    provider: Mapped[str | None] = mapped_column(Text)
     found: Mapped[int] = mapped_column(Integer, default=0)
     new_local_jobs: Mapped[int] = mapped_column(Integer, default=0)
     evaluated: Mapped[int] = mapped_column(Integer, default=0)
@@ -160,5 +162,4 @@ class ApplicationPackage(Base):
         DateTime(timezone=True),
         nullable=False,
     )
-
 
