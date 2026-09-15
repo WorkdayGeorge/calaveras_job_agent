@@ -3,7 +3,7 @@
 
 This project uses one Docker image in two Cloud Run modes:
 
-- **Cloud Run Service**: `calaveras-job-agent-web` — browser admin dashboard.
+- **Cloud Run Service**: `calaveras-job-agent` — browser admin dashboard.
 - **Cloud Run Job**: `calaveras-job-agent-worker` — Agent 1 + Agent 2 pipeline.
 - **Cloud Scheduler**: invokes the worker every 15 minutes.
 - **Cloud SQL PostgreSQL**: persistent jobs/settings/run history.
