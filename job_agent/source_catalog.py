@@ -85,6 +85,15 @@ JOB_SOURCES = [
             {"label": "PG&E Careers", "url": "https://jobs.pge.com/"}
         ],
     },
+    {
+        "key": "usajobs",
+        "name": "USAJOBS / U.S. Forest Service",
+        "type": "Federal government",
+        "description": "Official USAJOBS listings, initially configured for public U.S. Forest Service opportunities in the surrounding foothills.",
+        "links": [
+            {"label": "USAJOBS", "url": "https://www.usajobs.gov/"}
+        ],
+    },
 ]
 
 

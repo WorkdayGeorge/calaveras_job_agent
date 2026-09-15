@@ -21,6 +21,11 @@ location:
     - "Placerville"
     - "Sutter Creek"
     - "Twain Harte"
+    - "Camino"
+    - "Groveland"
+    - "Hathaway Pines"
+    - "Mi-Wuk Village"
+    - "Pinecrest"
 
 search_interval_minutes: 15
 fresh_job_window_minutes: 60

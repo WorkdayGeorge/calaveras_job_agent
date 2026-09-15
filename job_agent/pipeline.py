@@ -20,6 +20,7 @@ from .providers.ccwd import CCWDProvider
 from .providers.edjoin_calaveras import EDJoinCalaverasProvider
 from .providers.adventist_health import AdventistHealthProvider
 from .providers.pge import PGEProvider
+from .providers.usajobs import USAJobsProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting, enabled_terms
@@ -54,6 +55,8 @@ def get_providers():
             providers.append(AdventistHealthProvider())
         elif name == "pge":
             providers.append(PGEProvider())
+        elif name == "usajobs":
+            providers.append(USAJobsProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:

@@ -90,6 +90,12 @@ Adzuna's returned `created` timestamp is used when available. Jobs without an
 exact timestamp are never promoted to the strict "verified within 60 minutes"
 queue.
 
+The reusable `usajobs` provider uses the official USAJOBS API. It defaults to
+public U.S. Forest Service (`AG11`) openings within 75 miles of Sonora. Configure
+`USAJOBS_API_KEY` and `USAJOBS_USER_AGENT` (the email used to request the key)
+through environment variables or Secret Manager. Midnight/date-only publication
+values remain unverified rather than being treated as exact posting times.
+
 ## OpenAI evaluator
 
 Set:
