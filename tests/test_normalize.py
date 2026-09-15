@@ -8,6 +8,9 @@ from job_agent.schemas import RawJob
 SETTINGS = {
     "location": {
         "primary": "Calaveras County, CA",
+        "allowed_counties": [
+            "Calaveras County", "Amador County", "Tuolumne County"
+        ],
         "allowed_localities": ["Murphys", "Angels Camp", "Avery", "Bear Valley", "San Andreas"]
     },
     "fresh_job_window_minutes": 60,
@@ -22,6 +25,12 @@ class NormalizeTests(unittest.TestCase):
 
     def test_nonlocal(self):
         self.assertFalse(is_local_location("Sonora, CA", SETTINGS))
+
+    def test_amador_county_is_local(self):
+        self.assertTrue(is_local_location("Jackson, Amador County, CA", SETTINGS))
+
+    def test_tuolumne_county_is_local(self):
+        self.assertTrue(is_local_location("Sonora, Tuolumne County, CA", SETTINGS))
 
     def test_fresh_job(self):
         now = datetime.now(timezone.utc)

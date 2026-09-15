@@ -21,6 +21,8 @@ from .providers.edjoin_calaveras import EDJoinCalaverasProvider
 from .providers.adventist_health import AdventistHealthProvider
 from .providers.pge import PGEProvider
 from .providers.usajobs import USAJobsProvider
+from .providers.amador_county import AmadorCountyProvider
+from .providers.tuolumne_county import TuolumneCountyProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting, enabled_terms
@@ -57,6 +59,10 @@ def get_providers():
             providers.append(PGEProvider())
         elif name == "usajobs":
             providers.append(USAJobsProvider())
+        elif name == "amador_county":
+            providers.append(AmadorCountyProvider())
+        elif name == "tuolumne_county":
+            providers.append(TuolumneCountyProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:
@@ -251,17 +257,32 @@ def run_once(force: bool = False) -> dict:
             for provider in providers:
                 provider_name = type(provider).__name__.replace("Provider", "")
                 for role in terms:
-                    try:
-                        raw_jobs = provider.search(
-                            role=role,
-                            location=settings["location"]["primary"],
-                            results_per_page=25,
+                    if isinstance(provider, AdzunaProvider):
+                        search_locations = (
+                            settings["location"].get("search_locations")
+                            or [settings["location"]["primary"]]
                         )
-                    except Exception as exc:
-                        message = f"{provider_name} search failed for {role!r}: {exc}"
-                        provider_errors.append(message)
-                        print(message)
-                        continue
+                    else:
+                        search_locations = [
+                            settings["location"]["primary"]
+                        ]
+                    raw_jobs = []
+                    for search_location in search_locations:
+                        try:
+                            raw_jobs.extend(
+                                provider.search(
+                                    role=role,
+                                    location=search_location,
+                                    results_per_page=25,
+                                )
+                            )
+                        except Exception as exc:
+                            message = (
+                                f"{provider_name} search failed for {role!r} "
+                                f"in {search_location!r}: {exc}"
+                            )
+                            provider_errors.append(message)
+                            print(message)
 
                     found += len(raw_jobs)
 

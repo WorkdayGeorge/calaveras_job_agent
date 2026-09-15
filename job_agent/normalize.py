@@ -38,7 +38,10 @@ def is_local_location(location: str | None, settings: dict) -> bool:
         return False
     l = location.lower()
     primary = settings["location"]["primary"].lower()
-    if "calaveras county" in l or primary in l:
+    allowed_counties = settings["location"].get(
+        "allowed_counties", ["Calaveras County"]
+    )
+    if primary in l or any(county.lower() in l for county in allowed_counties):
         return True
     for locality in settings["location"].get("allowed_localities", []):
         if locality.lower() in l and ("ca" in l or "california" in l):

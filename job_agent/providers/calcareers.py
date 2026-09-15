@@ -38,7 +38,11 @@ class CalCareersProvider(JobProvider):
     )
 
     # Confirmed from the live CalCareers location selector.
-    CALAVERAS_LOCATION_ID = 42
+    LOCATION_IDS = {
+        "Amador County": 26,
+        "Calaveras County": 42,
+        "Tuolumne County": 640,
+    }
 
     def __init__(self) -> None:
         self._cached_jobs: list[RawJob] | None = None
@@ -133,7 +137,7 @@ class CalCareersProvider(JobProvider):
 
         return match.group(1).strip() if match else None
 
-    def _build_form(self, page_html: str) -> dict:
+    def _build_form(self, page_html: str, location_id: int) -> dict:
         parser = _InputParser()
         parser.feed(page_html)
 
@@ -166,7 +170,7 @@ class CalCareersProvider(JobProvider):
             "ctl00$hdnShowHeaderPadding": "1",
 
             "ctl00$cphMainContent$hdnSearchCriteria":
-                f"#locid={self.CALAVERAS_LOCATION_ID}",
+                f"#locid={location_id}",
 
             "ctl00$cphMainContent$hdnSocMinorCode": "",
             "ctl00$cphMainContent$hdnSocMajorCode": "",
@@ -227,7 +231,7 @@ class CalCareersProvider(JobProvider):
             "__ASYNCPOST": "true",
         }
 
-    def _fetch_search_results(self) -> str:
+    def _fetch_search_results(self, location_id: int) -> str:
         response = self.session.get(
             self.SEARCH_URL,
             headers=self.headers,
@@ -235,7 +239,7 @@ class CalCareersProvider(JobProvider):
         )
         response.raise_for_status()
 
-        form = self._build_form(response.text)
+        form = self._build_form(response.text, location_id)
 
         ajax_headers = {
             **self.headers,
@@ -246,7 +250,7 @@ class CalCareersProvider(JobProvider):
             "Origin": self.BASE_URL,
             "Referer":
                 f"{self.SEARCH_URL}"
-                f"#locid={self.CALAVERAS_LOCATION_ID}",
+                f"#locid={location_id}",
         }
 
         response = self.session.post(
@@ -278,9 +282,7 @@ class CalCareersProvider(JobProvider):
         except requests.RequestException:
             return "", url
 
-    def _load_jobs(self) -> list[RawJob]:
-        text = self._fetch_search_results()
-
+    def _parse_jobs(self, text: str, county_name: str) -> list[RawJob]:
         # Locate each result by its JobPosting link.
         link_matches = list(
             re.finditer(
@@ -346,17 +348,17 @@ class CalCareersProvider(JobProvider):
             publish_date = self._publish_date(block)
 
             # Exact county safeguard. The CalCareers query itself is
-            # restricted to Calaveras, but retain a second verification.
+            # restricted to one requested county, but retain verification.
             if (
                 source_location
-                and "calaveras" not in source_location.lower()
+                and county_name.lower() not in source_location.lower()
             ):
                 continue
 
             location = (
                 source_location
                 if source_location
-                else "Calaveras County"
+                else county_name
             )
 
             if not re.search(r",\s*CA\s*$", location, re.I):
@@ -425,6 +427,26 @@ class CalCareersProvider(JobProvider):
             )
 
         return jobs
+
+    def _load_jobs(self) -> list[RawJob]:
+        jobs: dict[str, RawJob] = {}
+        successful_counties = 0
+        last_error: requests.RequestException | None = None
+        for county_name, location_id in self.LOCATION_IDS.items():
+            try:
+                text = self._fetch_search_results(location_id)
+                successful_counties += 1
+            except requests.RequestException as exc:
+                # A single county failure must not discard healthy counties.
+                last_error = exc
+                continue
+            for job in self._parse_jobs(text, county_name):
+                jobs[job.provider_job_id or job.apply_url] = job
+        if successful_counties == 0 and last_error is not None:
+            raise RuntimeError(
+                "CalCareers search failed for all configured counties"
+            ) from last_error
+        return list(jobs.values())
 
     def search(
         self,

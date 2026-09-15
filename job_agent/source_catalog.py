@@ -22,6 +22,24 @@ JOB_SOURCES = [
         ],
     },
     {
+        "key": "amador_county",
+        "name": "Amador County Government Jobs",
+        "type": "Local government",
+        "description": "Official Amador County job postings hosted by GovernmentJobs/NEOGOV.",
+        "links": [
+            {"label": "Amador County Careers", "url": "https://www.governmentjobs.com/careers/amadorgov"}
+        ],
+    },
+    {
+        "key": "tuolumne_county",
+        "name": "Tuolumne County Government Jobs",
+        "type": "Local government",
+        "description": "Official Tuolumne County job postings hosted by GovernmentJobs/NEOGOV.",
+        "links": [
+            {"label": "Tuolumne County Careers", "url": "https://www.governmentjobs.com/careers/tuolumnecounty"}
+        ],
+    },
+    {
         "key": "calcareers",
         "name": "CalCareers",
         "type": "State government",

@@ -15,6 +15,8 @@ class CalaverasCountyProvider(JobProvider):
         "https://www.governmentjobs.com/"
         "SearchEngine/JobsFeed?agency=calaverascounty"
     )
+    COUNTY_NAME = "Calaveras County"
+    SOURCE_KEY = "calaveras_county"
 
     NS = {
         "job": "http://www.neogov.com/namespaces/JobListing",
@@ -114,14 +116,14 @@ class CalaverasCountyProvider(JobProvider):
             source_location = self._job_text(item, "location")
 
             if source_location:
-                location = f"{source_location}, Calaveras County, CA"
+                location = f"{source_location}, {self.COUNTY_NAME}, CA"
             else:
-                location = "Calaveras County, CA"
+                location = f"{self.COUNTY_NAME}, CA"
 
             # Important:
             #
-            # NEOGOV provides advertiseFromDateUTC, but the feed shown
-            # by Calaveras County normalizes it to midnight. pubDate may
+            # NEOGOV provides advertiseFromDateUTC, but these county feeds
+            # normalize it to midnight. pubDate may
             # reflect a later feed/update event. Neither safely proves
             # the exact original posting time.
             #
@@ -132,13 +134,13 @@ class CalaverasCountyProvider(JobProvider):
                 RawJob(
                     provider_job_id=job_id or job_number or link,
                     title=title,
-                    company="Calaveras County",
+                    company=self.COUNTY_NAME,
                     location=location,
                     employment_type=self._job_text(item, "jobType"),
                     description=combined_description or description,
                     posted_at=None,
                     apply_url=link,
-                    source="calaveras_county",
+                    source=self.SOURCE_KEY,
                     source_url=link,
                     requirements=(
                         [qualifications]

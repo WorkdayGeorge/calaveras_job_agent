@@ -1,5 +1,13 @@
 location:
   primary: "Calaveras County, CA"
+  search_locations:
+    - "Calaveras County, CA"
+    - "Amador County, CA"
+    - "Tuolumne County, CA"
+  allowed_counties:
+    - "Calaveras County"
+    - "Amador County"
+    - "Tuolumne County"
   # Conservative local whitelist used when a provider does not return a county.
   allowed_localities:
     - "Angels Camp"
@@ -26,6 +34,15 @@ location:
     - "Hathaway Pines"
     - "Mi-Wuk Village"
     - "Pinecrest"
+    - "Amador City"
+    - "Buckhorn"
+    - "Pine Grove"
+    - "Pioneer"
+    - "Plymouth"
+    - "Volcano"
+    - "Columbia"
+    - "Soulsbyville"
+    - "Tuolumne"
 
 search_interval_minutes: 15
 fresh_job_window_minutes: 60
