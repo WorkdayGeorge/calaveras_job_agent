@@ -2,10 +2,21 @@
 from __future__ import annotations
 
 import smtplib
+import re
 from email.message import EmailMessage
 from datetime import datetime, timezone
 
 from .config import env
+
+
+def normalize_email_address(value: str | None) -> str | None:
+    """Return a safe single recipient address, or None when invalid."""
+    address = str(value or "").strip()
+    if "\r" in address or "\n" in address:
+        return None
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address):
+        return None
+    return address
 
 def notification_bucket(job: dict, evaluation: dict, settings: dict) -> str:
     score = int(evaluation["fit_score"])
@@ -57,7 +68,12 @@ def console_notify(job: dict, evaluation: dict, bucket: str) -> None:
     print(body)
     print("=" * 72)
 
-def email_notify(job: dict, evaluation: dict, bucket: str) -> tuple[bool, str]:
+def email_notify(
+    job: dict,
+    evaluation: dict,
+    bucket: str,
+    recipient: str | None = None,
+) -> tuple[bool, str]:
     if str(env("SMTP_ENABLED", "false")).lower() not in {"1", "true", "yes", "on"}:
         return False, "SMTP disabled"
 
@@ -65,11 +81,11 @@ def email_notify(job: dict, evaluation: dict, bucket: str) -> tuple[bool, str]:
     port = int(env("SMTP_PORT", "587"))
     username = env("SMTP_USERNAME")
     password = env("SMTP_PASSWORD")
-    to_addr = env("ALERT_EMAIL_TO")
+    to_addr = normalize_email_address(recipient or env("ALERT_EMAIL_TO"))
     from_addr = env("ALERT_EMAIL_FROM") or username
 
     if not all([host, username, password, to_addr, from_addr]):
-        return False, "SMTP settings incomplete"
+        return False, "SMTP settings incomplete or alert recipient invalid"
 
     subject, body = format_message(job, evaluation, bucket)
     msg = EmailMessage()
@@ -87,7 +103,10 @@ def email_notify(job: dict, evaluation: dict, bucket: str) -> tuple[bool, str]:
     except Exception as exc:
         return False, str(exc)
 
-def email_high_priority_digest(items: list[tuple[dict, dict]]) -> tuple[bool, str]:
+def email_high_priority_digest(
+    items: list[tuple[dict, dict]],
+    recipient: str | None = None,
+) -> tuple[bool, str]:
     if not items:
         return False, "no pending digest items"
 
@@ -98,11 +117,11 @@ def email_high_priority_digest(items: list[tuple[dict, dict]]) -> tuple[bool, st
     port = int(env("SMTP_PORT", "587"))
     username = env("SMTP_USERNAME")
     password = env("SMTP_PASSWORD")
-    to_addr = env("ALERT_EMAIL_TO")
+    to_addr = normalize_email_address(recipient or env("ALERT_EMAIL_TO"))
     from_addr = env("ALERT_EMAIL_FROM") or username
 
     if not all([host, username, password, to_addr, from_addr]):
-        return False, "SMTP settings incomplete"
+        return False, "SMTP settings incomplete or alert recipient invalid"
 
     lines = [
         "High-Priority Daily Job Digest",

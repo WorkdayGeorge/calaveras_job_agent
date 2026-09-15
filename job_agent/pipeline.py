@@ -102,6 +102,10 @@ def _runtime_settings(session, yaml_settings: dict) -> dict:
     settings["timestamp_policy"]["allow_unverified_current_jobs_in_digest"] = get_bool(
         session, "allow_unverified_current_jobs_in_digest", True
     )
+    settings["alert_email_to"] = (
+        get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
+        or env("ALERT_EMAIL_TO", "")
+    )
     return settings
 
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
@@ -190,7 +194,11 @@ def process_high_priority_digest(session) -> dict:
             "recommendation": evaluation.recommendation,
         }))
 
-    sent, detail = email_high_priority_digest(items)
+    recipient = (
+        get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
+        or env("ALERT_EMAIL_TO", "")
+    )
+    sent, detail = email_high_priority_digest(items, recipient=recipient)
     if not sent:
         print(f"High-priority digest send failed: {detail}")
         return {"status": "failed", "detail": detail}
@@ -346,7 +354,12 @@ def run_once(force: bool = False) -> dict:
                         elif bucket != "silent":
                             alerts += 1
                             console_notify(job_dict, result, bucket)
-                            sent, detail = email_notify(job_dict, result, bucket)
+                            sent, detail = email_notify(
+                                job_dict,
+                                result,
+                                bucket,
+                                recipient=settings.get("alert_email_to"),
+                            )
                             session.add(Notification(
                                 job_id=job.id,
                                 evaluation_id=evaluation.id,

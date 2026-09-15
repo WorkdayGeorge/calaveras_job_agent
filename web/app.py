@@ -18,7 +18,7 @@ from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset, A
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
 from job_agent.config import load_settings, env
-from job_agent.notify import email_notify
+from job_agent.notify import email_notify, normalize_email_address
 from job_agent.settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting
 )
@@ -213,10 +213,21 @@ def test_email(request: Request):
         "missing_requirements": [],
     }
 
+    with SessionLocal() as session:
+        recipient = (
+            get_setting(
+                session,
+                "alert_email_to",
+                env("ALERT_EMAIL_TO", ""),
+            )
+            or env("ALERT_EMAIL_TO", "")
+        )
+
     sent, result = email_notify(
         test_job,
         test_evaluation,
         "test",
+        recipient=recipient,
     )
 
     if sent:
@@ -261,6 +272,14 @@ def settings_page(request: Request):
                  ).split(",")
                  if day.strip().isdigit()
             },
+            "alert_email_to": (
+                get_setting(
+                    session,
+                    "alert_email_to",
+                    env("ALERT_EMAIL_TO", ""),
+                )
+                or env("ALERT_EMAIL_TO", "")
+            ),
         }
     return templates.TemplateResponse(
         request,
@@ -280,18 +299,24 @@ def save_settings(
     high_priority_digest_time: str = Form(...),
     schedule_days: list[str] = Form([]),
     allow_unverified_current_jobs_in_digest: str | None = Form(None),
-
-
-
-
-
-
-
+    alert_email_to: str = Form(""),
 ):
     denial = require_auth(request)
     if denial:
         return denial
+    recipient_input = alert_email_to.strip()
+    validated_recipient = (
+        normalize_email_address(recipient_input)
+        if recipient_input
+        else ""
+    )
+    if recipient_input and not validated_recipient:
+        return RedirectResponse(
+            "/settings?message=Enter+a+valid+single+email+address",
+            status_code=303,
+        )
     with SessionLocal() as session:
+        set_setting(session, "alert_email_to", validated_recipient)
         set_setting(
             session,
             "fresh_job_window_minutes",
@@ -365,7 +390,10 @@ def save_settings(
             "allow_unverified_current_jobs_in_digest",
             "true" if allow_unverified_current_jobs_in_digest else "false",
         )
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse(
+        "/settings?message=Settings+saved",
+        status_code=303,
+    )
 
 @app.post("/settings/search-terms/add")
 def add_term(request: Request, term: str = Form(...)):
