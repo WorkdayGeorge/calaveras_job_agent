@@ -67,6 +67,15 @@ JOB_SOURCES = [
             {"label": "Calaveras Unified School District", "url": "https://www.edjoin.org/calaverasusd"}
         ],
     },
+    {
+        "key": "adventist_health",
+        "name": "Adventist Health",
+        "type": "Healthcare",
+        "description": "Official Adventist Health careers for Sonora and nearby foothill locations.",
+        "links": [
+            {"label": "Adventist Health Careers", "url": "https://careers.adventisthealth.org/"}
+        ],
+    },
 ]
 
 

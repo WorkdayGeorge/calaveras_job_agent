@@ -18,6 +18,7 @@ from .providers.commonspirit import CommonSpiritProvider
 from .providers.bear_valley import BearValleyProvider
 from .providers.ccwd import CCWDProvider
 from .providers.edjoin_calaveras import EDJoinCalaverasProvider
+from .providers.adventist_health import AdventistHealthProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting, enabled_terms
@@ -48,6 +49,8 @@ def get_providers():
             providers.append(CCWDProvider())
         elif name == "edjoin_calaveras":
             providers.append(EDJoinCalaverasProvider())
+        elif name == "adventist_health":
+            providers.append(AdventistHealthProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:

@@ -13,6 +13,7 @@ location:
     - "Mokelumne Hill"
     - "West Point"
     - "Mountain Ranch"
+    - "Sonora"
 
 search_interval_minutes: 15
 fresh_job_window_minutes: 60
