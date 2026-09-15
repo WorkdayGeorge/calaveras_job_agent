@@ -76,6 +76,15 @@ JOB_SOURCES = [
             {"label": "Adventist Health Careers", "url": "https://careers.adventisthealth.org/"}
         ],
     },
+    {
+        "key": "pge",
+        "name": "Pacific Gas and Electric Company (PG&E)",
+        "type": "Utility",
+        "description": "Official PG&E careers for Calaveras County and the surrounding Sierra foothills.",
+        "links": [
+            {"label": "PG&E Careers", "url": "https://jobs.pge.com/"}
+        ],
+    },
 ]
 
 

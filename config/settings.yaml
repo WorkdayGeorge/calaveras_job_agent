@@ -14,6 +14,13 @@ location:
     - "West Point"
     - "Mountain Ranch"
     - "Sonora"
+    - "Auburn"
+    - "Ione"
+    - "Jackson"
+    - "Jamestown"
+    - "Placerville"
+    - "Sutter Creek"
+    - "Twain Harte"
 
 search_interval_minutes: 15
 fresh_job_window_minutes: 60
