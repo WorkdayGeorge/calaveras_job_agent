@@ -86,6 +86,26 @@ JOB_SOURCES = [
         ],
     },
     {
+        "key": "edjoin_amador",
+        "name": "EDJOIN - Amador Schools",
+        "type": "Education",
+        "description": "Public-school jobs from Amador County Office of Education and Amador County Unified School District.",
+        "links": [
+            {"label": "Amador County Office of Education", "url": "https://www.edjoin.org/amadorcoe"},
+            {"label": "Amador County Unified School District", "url": "https://www.edjoin.org/acusd"},
+        ],
+    },
+    {
+        "key": "edjoin_tuolumne",
+        "name": "EDJOIN - Tuolumne Schools",
+        "type": "Education",
+        "description": "Public-school jobs from all Tuolumne County employers listed in EDJOIN's official county directory.",
+        "links": [
+            {"label": "Tuolumne County Superintendent of Schools", "url": "https://www.edjoin.org/tcsos"},
+            {"label": "EDJOIN Tuolumne County Search", "url": "https://www.edjoin.org/Home/Jobs?countyID=56"},
+        ],
+    },
+    {
         "key": "adventist_health",
         "name": "Adventist Health",
         "type": "Healthcare",

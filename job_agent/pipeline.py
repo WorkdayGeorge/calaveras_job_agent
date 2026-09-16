@@ -18,6 +18,8 @@ from .providers.commonspirit import CommonSpiritProvider
 from .providers.bear_valley import BearValleyProvider
 from .providers.ccwd import CCWDProvider
 from .providers.edjoin_calaveras import EDJoinCalaverasProvider
+from .providers.edjoin_amador import EDJoinAmadorProvider
+from .providers.edjoin_tuolumne import EDJoinTuolumneProvider
 from .providers.adventist_health import AdventistHealthProvider
 from .providers.pge import PGEProvider
 from .providers.usajobs import USAJobsProvider
@@ -54,6 +56,10 @@ def get_providers():
             providers.append(CCWDProvider())
         elif name == "edjoin_calaveras":
             providers.append(EDJoinCalaverasProvider())
+        elif name == "edjoin_amador":
+            providers.append(EDJoinAmadorProvider())
+        elif name == "edjoin_tuolumne":
+            providers.append(EDJoinTuolumneProvider())
         elif name == "adventist_health":
             providers.append(AdventistHealthProvider())
         elif name == "pge":

@@ -12,6 +12,8 @@ class EDJoinCalaverasProvider(JobProvider):
     """EDJOIN jobs for Calaveras County school employers."""
 
     API_URL = "https://www.edjoin.org/Home/LoadJobsPortalList"
+    COUNTY_NAME = "Calaveras County"
+    SOURCE_KEY = "edjoin_calaveras"
 
     DISTRICTS = [
         {
@@ -113,10 +115,10 @@ class EDJoinCalaverasProvider(JobProvider):
 
                 if city:
                     location = (
-                        f"{city}, {state} / Calaveras County, CA"
+                        f"{city}, {state} / {self.COUNTY_NAME}, CA"
                     )
                 else:
-                    location = "Calaveras County, CA"
+                    location = f"{self.COUNTY_NAME}, CA"
 
                 summary = self._clean(item.get("JobSummary"))
                 posting_info = self._clean(
@@ -162,7 +164,7 @@ class EDJoinCalaverasProvider(JobProvider):
                         description=description,
                         posted_at=None,
                         apply_url=apply_url,
-                        source="edjoin_calaveras",
+                        source=self.SOURCE_KEY,
                         source_url=district["portal"],
                         requirements=[],
                         metadata={
@@ -219,6 +221,6 @@ class EDJoinCalaverasProvider(JobProvider):
         return self._jobs
 
     def search(self, role=None, location=None, **kwargs):
-        # Return all open Calaveras school jobs.
+        # Return all open school jobs for this provider's county.
         # Agent 2 determines candidate fit.
         return self._load_jobs()
