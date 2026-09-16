@@ -112,6 +112,15 @@ JOB_SOURCES = [
             {"label": "USAJOBS", "url": "https://www.usajobs.gov/"}
         ],
     },
+    {
+        "key": "worldmark_angels_camp",
+        "name": "WorldMark Angels Camp",
+        "type": "Hospitality",
+        "description": "Official Travel + Leisure Co. careers for WorldMark and related Angels Camp openings.",
+        "links": [
+            {"label": "Travel + Leisure Co. Careers", "url": "https://careers.travelandleisureco.com/jobs/search?query=Angels+Camp"}
+        ],
+    },
 ]
 
 

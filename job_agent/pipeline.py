@@ -23,6 +23,7 @@ from .providers.pge import PGEProvider
 from .providers.usajobs import USAJobsProvider
 from .providers.amador_county import AmadorCountyProvider
 from .providers.tuolumne_county import TuolumneCountyProvider
+from .providers.worldmark_angels_camp import WorldMarkAngelsCampProvider
 from .repository import upsert_job, evaluation_exists
 from .settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting, enabled_terms
@@ -63,6 +64,8 @@ def get_providers():
             providers.append(AmadorCountyProvider())
         elif name == "tuolumne_county":
             providers.append(TuolumneCountyProvider())
+        elif name == "worldmark_angels_camp":
+            providers.append(WorldMarkAngelsCampProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:
