@@ -77,9 +77,9 @@ JOB_SOURCES = [
     },
     {
         "key": "edjoin_calaveras",
-        "name": "EDJOIN - Calaveras Schools",
+        "name": "EDJOIN - Calaveras County Public Schools",
         "type": "Education",
-        "description": "Public school jobs from Calaveras County Office of Education and Calaveras Unified School District.",
+        "description": "Official public-school jobs for Calaveras County Office of Education and Calaveras Unified School District.",
         "links": [
             {"label": "Calaveras County Office of Education", "url": "https://www.edjoin.org/calaverascoe"},
             {"label": "Calaveras Unified School District", "url": "https://www.edjoin.org/calaverasusd"}
@@ -87,9 +87,9 @@ JOB_SOURCES = [
     },
     {
         "key": "edjoin_amador",
-        "name": "EDJOIN - Amador Schools",
+        "name": "EDJOIN - Amador County Public Schools",
         "type": "Education",
-        "description": "Public-school jobs from Amador County Office of Education and Amador County Unified School District.",
+        "description": "Official public-school jobs for Amador County Office of Education and Amador County Unified School District.",
         "links": [
             {"label": "Amador County Office of Education", "url": "https://www.edjoin.org/amadorcoe"},
             {"label": "Amador County Unified School District", "url": "https://www.edjoin.org/acusd"},
@@ -97,9 +97,9 @@ JOB_SOURCES = [
     },
     {
         "key": "edjoin_tuolumne",
-        "name": "EDJOIN - Tuolumne Schools",
+        "name": "EDJOIN - Tuolumne County Public Schools",
         "type": "Education",
-        "description": "Public-school jobs from all Tuolumne County employers listed in EDJOIN's official county directory.",
+        "description": "Official public-school jobs for all 11 Tuolumne County employers listed in EDJOIN's county directory, including the county office, district, and charter-school postings.",
         "links": [
             {"label": "Tuolumne County Superintendent of Schools", "url": "https://www.edjoin.org/tcsos"},
             {"label": "EDJOIN Tuolumne County Search", "url": "https://www.edjoin.org/Home/Jobs?countyID=56"},
