@@ -18,56 +18,6 @@ def normalize_email_address(value: str | None) -> str | None:
         return None
     return address
 
-
-def normalize_us_phone(value: str | None) -> str | None:
-    """Return ten US phone digits for Verizon email-to-text."""
-    digits = re.sub(r"\D", "", str(value or ""))
-    if len(digits) == 11 and digits.startswith("1"):
-        digits = digits[1:]
-    return digits if len(digits) == 10 else None
-
-
-def _sms_message(job: dict, evaluation: dict) -> EmailMessage:
-    title = str(job.get("title") or "Job")[:60]
-    company = str(job.get("company") or "employer")[:40]
-    score = int(evaluation.get("fit_score") or 0)
-    message = EmailMessage()
-    message["Subject"] = "Job alert"
-    message.set_content(
-        f"Job alert: {score}% {title} at {company}. Check email for details."
-    )
-    return message
-
-
-def _digest_sms_message(count: int) -> EmailMessage:
-    message = EmailMessage()
-    message["Subject"] = "Job digest"
-    message.set_content(
-        f"Job alert: {count} strong-fit job(s) were sent in your email digest."
-    )
-    return message
-
-
-def _send_optional_verizon_text(
-    smtp,
-    message: EmailMessage,
-    from_addr: str,
-    phone_number: str | None,
-) -> str:
-    if not phone_number:
-        return "text disabled"
-    digits = normalize_us_phone(phone_number)
-    if not digits:
-        return "text skipped: invalid Verizon mobile number"
-    message["From"] = from_addr
-    message["To"] = f"{digits}@vtext.com"
-    try:
-        smtp.send_message(message)
-        return "Verizon text sent"
-    except Exception as exc:
-        # Email has already succeeded; an SMS gateway failure is non-fatal.
-        return f"Verizon text failed: {exc}"
-
 def notification_bucket(job: dict, evaluation: dict, settings: dict) -> str:
     score = int(evaluation["fit_score"])
     fresh = job.get("freshness_status") == "verified_fresh"
@@ -123,7 +73,6 @@ def email_notify(
     evaluation: dict,
     bucket: str,
     recipient: str | None = None,
-    sms_phone_number: str | None = None,
 ) -> tuple[bool, str]:
     if str(env("SMTP_ENABLED", "false")).lower() not in {"1", "true", "yes", "on"}:
         return False, "SMTP disabled"
@@ -150,20 +99,13 @@ def email_notify(
             smtp.starttls()
             smtp.login(username, password)
             smtp.send_message(msg)
-            text_detail = _send_optional_verizon_text(
-                smtp,
-                _sms_message(job, evaluation),
-                from_addr,
-                sms_phone_number,
-            )
-        return True, f"email sent; {text_detail}"
+        return True, "sent"
     except Exception as exc:
         return False, str(exc)
 
 def email_high_priority_digest(
     items: list[tuple[dict, dict]],
     recipient: str | None = None,
-    sms_phone_number: str | None = None,
 ) -> tuple[bool, str]:
     if not items:
         return False, "no pending digest items"
@@ -210,12 +152,6 @@ def email_high_priority_digest(
             smtp.starttls()
             smtp.login(username, password)
             smtp.send_message(msg)
-            text_detail = _send_optional_verizon_text(
-                smtp,
-                _digest_sms_message(len(items)),
-                from_addr,
-                sms_phone_number,
-            )
-        return True, f"email sent; {text_detail}"
+        return True, "sent"
     except Exception as exc:
         return False, str(exc)

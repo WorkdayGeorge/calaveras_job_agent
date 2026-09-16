@@ -28,22 +28,6 @@
     Immediate alerts, daily high-priority digests, and test emails use this address. Leave it blank to retain the deployment default. SMTP credentials remain in Secret Manager.
   </p>
 
-  <div class="row">
-    <div>
-      <label>Send a Verizon text to</label>
-      <input
-        type="tel"
-        name="sms_phone_number"
-        value="{{ values.sms_phone_number }}"
-        placeholder="555-123-4567"
-        autocomplete="tel"
-      >
-    </div>
-  </div>
-  <p class="muted">
-    Optional. A short text is sent only after the corresponding email succeeds. This uses Verizon's no-cost legacy email-to-text gateway, which Verizon plans to retire by March 31, 2027 and may restrict earlier. Leave blank to disable texts.
-  </p>
-
   <h2>Search Schedule</h2>
 
   <p class="muted">
