@@ -74,3 +74,12 @@ def test_wrong_codes_increment_attempts_and_eventually_lock_token():
     session.refresh(token)
     assert token.attempts == 5
     assert consume_token(session, user, "login_otp", "654321") is False
+
+
+def test_new_token_invalidates_earlier_unused_token():
+    session = make_session()
+    user = make_user(session)
+    issue_token(session, user, "login_otp", "123456", minutes=10)
+    issue_token(session, user, "login_otp", "654321", minutes=10)
+    assert consume_token(session, user, "login_otp", "123456") is False
+    assert consume_token(session, user, "login_otp", "654321") is True

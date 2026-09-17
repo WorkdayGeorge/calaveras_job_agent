@@ -35,6 +35,7 @@ from job_agent.profile_store import (
     validate_candidate_profile,
 )
 from job_agent.analytics import build_admin_analytics, resolve_date_range
+from job_agent.preflight import production_readiness
 
 
 
@@ -166,6 +167,7 @@ app.add_middleware(
     secret_key=env("SESSION_SECRET", "dev-only-change-me"),
     https_only=(env("APP_ENV", "development") == "production"),
     same_site="lax",
+    max_age=60 * 60 * 12,
 )
 
 def authed(request: Request) -> bool:
@@ -203,6 +205,13 @@ def require_admin(request: Request):
 
 @app.on_event("startup")
 def startup():
+    if env("APP_ENV", "development") == "production" and database_auth_enabled():
+        readiness_errors = production_readiness()
+        if readiness_errors:
+            raise RuntimeError(
+                "Database authentication rollout blocked: "
+                + " ".join(readiness_errors)
+            )
     init_db()
     with SessionLocal() as session:
         seed_settings(session, load_settings())
@@ -371,7 +380,8 @@ def forgot_password(request: Request, email: str = Form(...)):
             if user and user.status == "active":
                 raw_token = secrets.token_urlsafe(32)
                 issue_token(session, user, "password_reset", raw_token, minutes=30)
-                reset_url = str(request.url_for("reset_password_page")) + f"?token={raw_token}"
+                public_base_url = (env("PUBLIC_BASE_URL") or str(request.base_url)).rstrip("/")
+                reset_url = f"{public_base_url}/reset-password?token={raw_token}"
                 email_text(user.email, "Reset your Calaveras Job Agent password", f"Use this link within 30 minutes to reset your password:\n\n{reset_url}")
                 record_audit(session, "password_reset_requested", target_user_id=user.id, request=request)
     return templates.TemplateResponse(request, "forgot_password.html", {"message": generic})

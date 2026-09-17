@@ -178,6 +178,8 @@ GCP_PROJECT_ID=YOUR_PROJECT_ID
 GCP_REGION=us-west1
 CLOUD_RUN_JOB_NAME=calaveras-job-agent-worker
 GCS_BUCKET=YOUR_PROJECT_ID-job-agent-resumes
+AUTH_MODE=legacy
+PUBLIC_BASE_URL=https://YOUR_CLOUD_RUN_HOSTNAME
 ```
 
 Map secrets:
@@ -189,6 +191,26 @@ SESSION_SECRET
 ```
 
 Also attach the same Cloud SQL instance.
+
+Before enabling database-backed accounts, execute the deployed image with the
+service's production environment and run:
+
+```text
+python -m job_agent.preflight
+```
+
+Then test an administrator and one non-administrator account end to end:
+
+1. Sign in with email and password and receive the six-digit code.
+2. Change the user's temporary password.
+3. Confirm the user sees only Dashboard and Jobs.
+4. Request and complete a password reset.
+5. Confirm the administrator can see Analytics, Notifications, Users, Settings,
+   Resumes, Sources, Runs, and Audit Log.
+6. Confirm the worker sends results only to each user's configured address.
+
+Change `AUTH_MODE` to `database` only after these checks pass. Roll back by
+restoring `AUTH_MODE=legacy`; no user or job data needs to be deleted.
 
 The dashboard service account needs permission to run the worker job. Grant the
 narrowest role that permits `run.jobs.run` in your environment.

@@ -115,6 +115,20 @@ administration events. Browser POST requests are protected by same-origin
 validation in production, and responses include clickjacking, MIME-sniffing,
 referrer, and content-security headers.
 
+Before changing production to database authentication, run the configuration
+preflight in the same environment as the Cloud Run service:
+
+```bash
+python -m job_agent.preflight
+```
+
+The check does not print secret values. It verifies PostgreSQL, administrator
+identity, session-secret strength, SMTP requirements, and an HTTPS
+`PUBLIC_BASE_URL`. Keep `AUTH_MODE=legacy` if any check fails. A newly requested
+MFA code or password-reset link invalidates the user's earlier unused one. The
+web service also refuses to start in production database mode when this check
+fails, while legacy mode remains unaffected.
+
 ## Worker only
 
 ```bash

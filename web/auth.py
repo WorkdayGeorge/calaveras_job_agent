@@ -6,7 +6,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from job_agent.config import env
 from job_agent.models import AuditEvent, AuthToken, User
@@ -99,6 +99,17 @@ def utc_aware(value: datetime | None) -> datetime | None:
 
 def issue_token(session, user: User, purpose: str, raw_token: str, minutes: int) -> AuthToken:
     now = datetime.now(timezone.utc)
+    # A newly issued code/link replaces any earlier unused credential for the
+    # same purpose, limiting the number of valid credentials in circulation.
+    session.execute(
+        update(AuthToken)
+        .where(
+            AuthToken.user_id == user.id,
+            AuthToken.purpose == purpose,
+            AuthToken.used_at.is_(None),
+        )
+        .values(used_at=now)
+    )
     token = AuthToken(
         user_id=user.id,
         purpose=purpose,
