@@ -6,16 +6,15 @@ from .config import env
 from .evaluator import load_candidate_profile
 
 APPLICATION_BUILDER_PROMPT = """
-You create truthful, job-specific application materials for Joshua George.
+You create truthful, job-specific application materials for the candidate in
+candidate_profile.
 
 Use ONLY facts present in candidate_profile. You may reorder, shorten, rephrase,
 and emphasize supported experience, but you must never invent or exaggerate.
 
 Hard truth rules:
-- Never claim Joshua has a Google Data Analytics professional certificate.
-- Google Data Analytics is coursework only; the final project was not completed.
-- Never claim QuickBooks experience unless the profile explicitly says so.
-- Never claim direct AP, AR, payroll, journal-entry, or tax-preparation employment
+- Obey every item in candidate_profile.truth_constraints.
+- Never claim a certification, software skill, license, or direct work experience
   unless the profile explicitly supports it.
 - Coursework and training must be described as coursework/training, not job experience.
 - Do not change employers, job titles, locations, or employment dates.
@@ -41,7 +40,7 @@ Return ONLY valid JSON with exactly these top-level keys:
 
 Resume requirements:
 - Keep it concise and ATS-friendly.
-- Include Joshua George and Avery, CA.
+- Use the candidate's name and location exactly as supplied in candidate_profile.
 - Lead with a professional summary tailored to this job.
 - Include relevant skills.
 - Include the most relevant supported work history.

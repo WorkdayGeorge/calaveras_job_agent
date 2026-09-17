@@ -24,6 +24,14 @@ def assign_legacy_records_to_admin(session, admin: User | None) -> None:
         session.execute(
             update(model).where(model.user_id.is_(None)).values(user_id=admin.id)
         )
+    session.execute(
+        update(ApplicationPackage)
+        .where(
+            ApplicationPackage.user_id == admin.id,
+            ApplicationPackage.candidate_profile_version.is_(None),
+        )
+        .values(candidate_profile_version="master-profile-v1")
+    )
 
     existing_job_ids = set(
         session.scalars(

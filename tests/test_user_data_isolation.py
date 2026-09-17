@@ -125,6 +125,7 @@ def test_legacy_records_are_assigned_to_admin_idempotently():
     assert notification.user_id == admin.id
     assert resume.user_id == admin.id
     assert package.user_id == admin.id
+    assert package.candidate_profile_version == "master-profile-v1"
     states = session.scalars(
         select(UserJobState).where(
             UserJobState.user_id == admin.id,

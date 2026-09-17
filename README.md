@@ -67,10 +67,9 @@ The production-safe default remains the original single-administrator login:
 AUTH_MODE=legacy
 ```
 
-Database-backed accounts and per-user ownership are present, but database
-authentication should only be enabled after user-specific candidate profiles
-are connected to the evaluator and application builder. Enabling it early would
-score other users against the built-in Joshua profile.
+Database-backed accounts, per-user ownership, and administrator-approved
+candidate profiles are present. Keep `AUTH_MODE=legacy` during staged rollout
+until authorization and production email tests have passed with a test user.
 
 Before enabling database authentication, configure SMTP and set:
 
@@ -93,6 +92,17 @@ user. Existing legacy records are assigned to the first administrator
 idempotently. The Resume Manager lets the administrator select the user whose
 resume is being managed. Application Tracking records status, applied date,
 follow-up date, interview date, outcome, URL, and private notes.
+
+Each user has a versioned JSON candidate profile under **Users → Profile &
+alerts**. New profiles are inactive by default and are never populated by an
+automatic resume rewrite. The administrator must review the facts and truth
+constraints before activating evaluation. The worker evaluates each active
+profile independently, stores only that user's result, and uses that user's
+email and immediate/digest preferences. Updating profile facts creates a new
+profile version, so older scores and application packages are not presented as
+current results. Joshua's existing profile is seeded as `master-profile-v1`,
+including the existing Google coursework, QuickBooks, and accounting-experience
+truth safeguards.
 
 ## Worker only
 

@@ -14,11 +14,9 @@ Important candidate rules:
 - Distinguish direct experience from transferable skills.
 - Distinguish "not mentioned" from "does not have."
 - Coursework/training is not employment experience.
-- Do not claim QuickBooks experience unless the profile explicitly shows it.
-- Do not claim direct AP, AR, payroll, journal-entry, tax-preparation, or other
-  accounting employment unless the profile supports it.
-- The Google Data Analytics coursework was completed, but the final project was
-  not completed and no professional certificate was awarded.
+- Obey every item in candidate_profile.truth_constraints.
+- Do not claim any software skill, certification, license, or direct experience
+  unless the candidate profile explicitly supports it.
 - A different prior job title is not by itself a reason to reject a transition role.
 
 Score on this exact weighted framework:

@@ -23,6 +23,15 @@ def init_db() -> None:
                 connection.execute(
                     text(f"ALTER TABLE {table_name} ADD COLUMN user_id VARCHAR(36)")
                 )
+        application_columns = {
+            column["name"]
+            for column in inspector.get_columns("application_packages")
+        }
+        if "candidate_profile_version" not in application_columns:
+            connection.execute(text(
+                "ALTER TABLE application_packages "
+                "ADD COLUMN candidate_profile_version VARCHAR(100)"
+            ))
 
     if engine.dialect.name == "postgresql":
         columns = {

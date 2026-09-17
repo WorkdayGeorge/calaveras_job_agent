@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from .config import env
 from .db import SessionLocal, init_db
-from .models import Evaluation, Job, Notification, User
+from .models import Evaluation, Job, Notification, User, UserPreference
 from .notify import email_high_priority_digest
 from .pipeline import job_to_dict
 from .settings_store import get_int, get_setting
@@ -74,9 +74,14 @@ def send_digest_preview() -> dict:
             for job, evaluation in recent_rows
         ]
 
+        preference = session.get(UserPreference, owner_id) if owner_id else None
         recipient = (
-            get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
-            or env("ALERT_EMAIL_TO", "")
+            preference.notification_email
+            if preference
+            else (
+                get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
+                or env("ALERT_EMAIL_TO", "")
+            )
         )
         sent, detail = email_high_priority_digest(
             pending_items,

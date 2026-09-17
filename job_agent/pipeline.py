@@ -29,6 +29,7 @@ from .providers.amador_county import AmadorCountyProvider
 from .providers.tuolumne_county import TuolumneCountyProvider
 from .providers.worldmark_angels_camp import WorldMarkAngelsCampProvider
 from .repository import upsert_job, evaluation_exists
+from .profile_store import active_evaluation_targets
 from .settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting, enabled_terms
 )
@@ -36,6 +37,36 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 RESUME_VERSION = "master-profile-v1"
+
+
+def evaluation_targets(session) -> list[dict]:
+    targets = []
+    for user, profile, preference in active_evaluation_targets(session):
+        targets.append({
+            "user_id": user.id,
+            "profile": profile.profile_data,
+            "resume_version": profile.resume_version,
+            "recipient": preference.notification_email,
+            "immediate_alerts": preference.immediate_alerts,
+            "daily_digest": preference.daily_digest,
+            "digest_time": preference.digest_time,
+            "preference": preference,
+        })
+    if targets:
+        return targets
+    return [{
+        "user_id": None,
+        "profile": load_candidate_profile(),
+        "resume_version": RESUME_VERSION,
+        "recipient": (
+            get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
+            or env("ALERT_EMAIL_TO", "")
+        ),
+        "immediate_alerts": True,
+        "daily_digest": True,
+        "digest_time": get_setting(session, "high_priority_digest_time", "17:05") or "17:05",
+        "preference": None,
+    }]
 
 def get_providers():
     raw = env("JOB_PROVIDERS") or env("JOB_PROVIDER", "demo") or "demo"
@@ -172,122 +203,105 @@ def scheduled_run_allowed(session) -> tuple[bool, str]:
     return True, "scheduled run allowed"
 
 def process_high_priority_digest(session) -> dict:
-    """Send the daily high-priority digest once per Pacific calendar day."""
+    """Send an isolated daily digest to each active profile."""
     now_pt = datetime.now(PACIFIC_TZ)
     today = now_pt.date().isoformat()
-
-    digest_time_raw = get_setting(session, "high_priority_digest_time", "17:05") or "17:05"
-    try:
-        digest_time = time.fromisoformat(digest_time_raw)
-    except ValueError:
-        digest_time = time(17, 5)
-
-    if now_pt.time().replace(second=0, microsecond=0) < digest_time:
-        return {"status": "not_due"}
-
-    last_date = get_setting(session, "high_priority_digest_last_date", "") or ""
-    if last_date == today:
-        return {"status": "already_processed"}
-
-    owner_id = session.scalar(
-        select(User.id)
-        .where(User.role == "administrator", User.status == "active")
-        .order_by(User.created_at)
-        .limit(1)
-    )
-
-    rows = session.execute(
-        select(Notification, Job, Evaluation)
-        .join(Job, Notification.job_id == Job.id)
-        .join(Evaluation, Notification.evaluation_id == Evaluation.id)
-        .where(
-            Notification.status == "pending_digest",
-            Notification.user_id == owner_id,
-        )
-        .order_by(Evaluation.fit_score.desc(), Job.first_seen_at.desc())
-    ).all()
-
+    results = []
     immediate_alert_score = get_int(session, "immediate_alert_score", 75)
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    recent_rows = session.execute(
-        select(Job, Evaluation)
-        .join(Evaluation, Evaluation.job_id == Job.id)
-        .where(
-            Evaluation.user_id == owner_id,
-            Evaluation.evaluated_at >= cutoff,
-            Evaluation.fit_score >= immediate_alert_score,
+
+    for target in evaluation_targets(session):
+        if not target["daily_digest"]:
+            continue
+        try:
+            digest_time = time.fromisoformat(target["digest_time"])
+        except ValueError:
+            digest_time = time(17, 5)
+        if now_pt.time().replace(second=0, microsecond=0) < digest_time:
+            continue
+        preference = target["preference"]
+        last_date = (
+            preference.last_digest_date
+            if preference
+            else (get_setting(session, "high_priority_digest_last_date", "") or "")
         )
-        .order_by(Evaluation.fit_score.desc(), Evaluation.evaluated_at.desc())
-    ).all()
+        if last_date == today:
+            continue
 
-    if not rows and not recent_rows:
-        set_setting(session, "high_priority_digest_last_date", today)
-        return {"status": "no items", "count": 0}
+        owner_id = target["user_id"]
+        rows = session.execute(
+            select(Notification, Job, Evaluation)
+            .join(Job, Notification.job_id == Job.id)
+            .join(Evaluation, Notification.evaluation_id == Evaluation.id)
+            .where(
+                Notification.status == "pending_digest",
+                Notification.user_id == owner_id,
+            )
+            .order_by(Evaluation.fit_score.desc(), Job.first_seen_at.desc())
+        ).all()
+        recent_rows = session.execute(
+            select(Job, Evaluation)
+            .join(Evaluation, Evaluation.job_id == Job.id)
+            .where(
+                Evaluation.user_id == owner_id,
+                Evaluation.evaluated_at >= cutoff,
+                Evaluation.fit_score >= immediate_alert_score,
+            )
+            .order_by(Evaluation.fit_score.desc(), Evaluation.evaluated_at.desc())
+        ).all()
 
-    items = []
-    for notification, job, evaluation in rows:
-        items.append((job_to_dict(job), {
+        if not rows and not recent_rows:
+            if preference:
+                preference.last_digest_date = today
+            else:
+                set_setting(session, "high_priority_digest_last_date", today)
+            session.commit()
+            results.append({"user_id": owner_id, "status": "no items"})
+            continue
+
+        items = [(job_to_dict(job), {
             "fit_score": evaluation.fit_score,
             "classification": evaluation.classification,
             "recommendation": evaluation.recommendation,
-        }))
-
-    recent_immediate_items = []
-    for job, evaluation in recent_rows:
-        recent_immediate_items.append((job_to_dict(job), {
+        }) for _, job, evaluation in rows]
+        recent_items = [(job_to_dict(job), {
             "fit_score": evaluation.fit_score,
             "classification": evaluation.classification,
             "recommendation": evaluation.recommendation,
             "evaluated_at": evaluation.evaluated_at.isoformat(),
-        }))
+        }) for job, evaluation in recent_rows]
+        sent, detail = email_high_priority_digest(
+            items,
+            recipient=target["recipient"],
+            recent_immediate_items=recent_items,
+            immediate_alert_score=immediate_alert_score,
+        )
+        if not sent:
+            results.append({"user_id": owner_id, "status": "failed", "detail": detail})
+            continue
 
-    recipient = (
-        get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
-        or env("ALERT_EMAIL_TO", "")
-    )
-    sent, detail = email_high_priority_digest(
-        items,
-        recipient=recipient,
-        recent_immediate_items=recent_immediate_items,
-        immediate_alert_score=immediate_alert_score,
-    )
-    if not sent:
-        print(f"High-priority digest send failed: {detail}")
-        return {"status": "failed", "detail": detail}
+        sent_at = datetime.now(timezone.utc)
+        for notification, _, _ in rows:
+            notification.status = "sent"
+            notification.channel = "digest"
+            notification.sent_at = sent_at
+            notification.detail = "Sent in daily high-priority digest"
+        if preference:
+            preference.last_digest_date = today
+        else:
+            set_setting(session, "high_priority_digest_last_date", today)
+        session.commit()
+        results.append({"user_id": owner_id, "status": "sent", "count": len(rows)})
 
-    sent_at = datetime.now(timezone.utc)
-    for notification, _, _ in rows:
-        notification.status = "sent"
-        notification.channel = "digest"
-        notification.sent_at = sent_at
-        notification.detail = "Sent in daily high-priority digest"
-
-    set_setting(session, "high_priority_digest_last_date", today)
-    session.commit()
-    print(
-        "High-priority digest sent: "
-        f"{len(rows)} pending job(s), "
-        f"{len(recent_rows)} recent threshold job(s)."
-    )
-    return {
-        "status": "sent",
-        "count": len(rows),
-        "recent_immediate_count": len(recent_rows),
-    }
+    return {"status": "processed", "results": results}
 
 def run_once(force: bool = False) -> dict:
     yaml_settings = load_settings()
-    profile = load_candidate_profile()
     init_db()
 
     with SessionLocal() as session:
         seed_settings(session, yaml_settings)
-        owner_id = session.scalar(
-            select(User.id)
-            .where(User.role == "administrator", User.status == "active")
-            .order_by(User.created_at)
-            .limit(1)
-        )
+        targets = evaluation_targets(session)
 
         if not force and not get_bool(session, "agent_enabled", True):
             summary = {"status": "paused", "found": 0, "new_local_jobs": 0, "evaluated": 0, "alerts": 0}
@@ -369,75 +383,103 @@ def run_once(force: bool = False) -> dict:
                         if is_new:
                             inserted += 1
     
-                        if job.id in processed_job_ids:
-                            continue
-
-                        if evaluation_exists(session, job.id, RESUME_VERSION, owner_id):
-                            processed_job_ids.add(job.id)
-                            continue
-
-                        processed_job_ids.add(job.id)
-    
                         job_dict = job_to_dict(job)
-                        result = evaluate_job(job_dict, profile)
-                        evaluation = Evaluation(
-                            user_id=owner_id,
-                            job_id=job.id,
-                            resume_version=RESUME_VERSION,
-                            fit_score=int(result["fit_score"]),
-                            classification=result["classification"],
-                            recommendation=result["recommendation"],
-                            selected_resume=result["selected_resume"],
-                            matching_skills=result.get("matching_skills", []),
-                            transferable_skills=result.get("transferable_skills", []),
-                            missing_requirements=result.get("missing_requirements", []),
-                            uncertain_requirements=result.get("uncertain_requirements", []),
-                            reasoning=result["reasoning"],
-                            score_breakdown=result.get("score_breakdown", {}),
-                            evaluated_at=datetime.now(timezone.utc),
-                        )
-                        session.add(evaluation)
+                        for target in targets:
+                            owner_id = target["user_id"]
+                            resume_version = target["resume_version"]
+                            process_key = (job.id, owner_id, resume_version)
+                            if process_key in processed_job_ids:
+                                continue
+                            processed_job_ids.add(process_key)
+                            if evaluation_exists(
+                                session, job.id, resume_version, owner_id
+                            ):
+                                continue
 
-                        try:
-                            session.commit()
-                            session.refresh(evaluation)
-                        except IntegrityError:
-                            session.rollback()
-                            continue
-
-                        evaluated += 1
-    
-                        bucket = notification_bucket(job_dict, result, settings)
-                        if bucket == "high_priority_digest":
-                            session.add(Notification(
+                            try:
+                                result = evaluate_job(job_dict, target["profile"])
+                            except Exception as exc:
+                                message = (
+                                    "Evaluation failed for job "
+                                    f"{job.id} and user {owner_id or 'legacy'}: {exc}"
+                                )
+                                provider_errors.append(message)
+                                print(message)
+                                continue
+                            evaluation = Evaluation(
                                 user_id=owner_id,
                                 job_id=job.id,
-                                evaluation_id=evaluation.id,
-                                channel="digest",
-                                sent_at=datetime.now(timezone.utc),
-                                status="pending_digest",
-                                detail="Queued for daily high-priority digest",
-                            ))
-                            session.commit()
-                        elif bucket != "silent":
-                            alerts += 1
-                            console_notify(job_dict, result, bucket)
-                            sent, detail = email_notify(
-                                job_dict,
-                                result,
-                                bucket,
-                                recipient=settings.get("alert_email_to"),
+                                resume_version=resume_version,
+                                fit_score=int(result["fit_score"]),
+                                classification=result["classification"],
+                                recommendation=result["recommendation"],
+                                selected_resume=result["selected_resume"],
+                                matching_skills=result.get("matching_skills", []),
+                                transferable_skills=result.get("transferable_skills", []),
+                                missing_requirements=result.get("missing_requirements", []),
+                                uncertain_requirements=result.get("uncertain_requirements", []),
+                                reasoning=result["reasoning"],
+                                score_breakdown=result.get("score_breakdown", {}),
+                                evaluated_at=datetime.now(timezone.utc),
                             )
-                            session.add(Notification(
-                                user_id=owner_id,
-                                job_id=job.id,
-                                evaluation_id=evaluation.id,
-                                channel="email" if sent else "console",
-                                sent_at=datetime.now(timezone.utc),
-                                status="sent" if sent else "not_sent",
-                                detail=detail,
-                            ))
-                            session.commit()
+                            session.add(evaluation)
+
+                            try:
+                                session.commit()
+                                session.refresh(evaluation)
+                            except IntegrityError:
+                                session.rollback()
+                                continue
+
+                            evaluated += 1
+                            target_settings = dict(settings)
+                            target_settings["alert_email_to"] = target["recipient"]
+                            bucket = notification_bucket(job_dict, result, target_settings)
+                            if (
+                                bucket == "high_priority_digest"
+                                and target["daily_digest"]
+                            ):
+                                session.add(Notification(
+                                    user_id=owner_id,
+                                    job_id=job.id,
+                                    evaluation_id=evaluation.id,
+                                    channel="digest",
+                                    sent_at=datetime.now(timezone.utc),
+                                    status="pending_digest",
+                                    detail="Queued for daily high-priority digest",
+                                ))
+                                session.commit()
+                            elif bucket != "silent":
+                                if target["immediate_alerts"]:
+                                    alerts += 1
+                                    console_notify(job_dict, result, bucket)
+                                    sent, detail = email_notify(
+                                        job_dict,
+                                        result,
+                                        bucket,
+                                        recipient=target["recipient"],
+                                    )
+                                    session.add(Notification(
+                                        user_id=owner_id,
+                                        job_id=job.id,
+                                        evaluation_id=evaluation.id,
+                                        channel="email" if sent else "console",
+                                        sent_at=datetime.now(timezone.utc),
+                                        status="sent" if sent else "not_sent",
+                                        detail=detail,
+                                    ))
+                                    session.commit()
+                                elif target["daily_digest"]:
+                                    session.add(Notification(
+                                        user_id=owner_id,
+                                        job_id=job.id,
+                                        evaluation_id=evaluation.id,
+                                        channel="digest",
+                                        sent_at=datetime.now(timezone.utc),
+                                        status="pending_digest",
+                                        detail="Queued because immediate alerts are disabled",
+                                    ))
+                                    session.commit()
 
             run.finished_at = datetime.now(timezone.utc)
             run.status = "partial" if provider_errors else "success"

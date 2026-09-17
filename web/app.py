@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -16,7 +17,7 @@ from sqlalchemy import select, desc, func, and_
 from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
     Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage,
-    User, UserJobState,
+    User, UserJobState, CandidateProfile, UserPreference,
 )
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
@@ -26,6 +27,11 @@ from job_agent.settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting
 )
 from job_agent.user_data import assign_legacy_records_to_admin, get_or_create_job_state
+from job_agent.profile_store import (
+    ensure_user_profile_records,
+    seed_admin_profile,
+    validate_candidate_profile,
+)
 
 
 
@@ -144,6 +150,11 @@ def owner_clause(column, request: Request):
     user_id = current_user_id(request)
     return column == user_id if user_id else column.is_(None)
 
+def current_resume_version(session, request: Request) -> str:
+    user_id = current_user_id(request)
+    profile = session.get(CandidateProfile, user_id) if user_id else None
+    return profile.resume_version if profile else "master-profile-v1"
+
 def require_auth(request: Request):
     if not authed(request):
         return RedirectResponse("/login", status_code=303)
@@ -166,6 +177,11 @@ def startup():
         seed_settings(session, load_settings())
         admin = bootstrap_admin(session)
         assign_legacy_records_to_admin(session, admin)
+        seed_admin_profile(
+            session,
+            admin,
+            get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", "")),
+        )
 
 @app.get("/health")
 def health():
@@ -368,12 +384,14 @@ def dashboard(request: Request, sort: str = "newest_posted"):
         return denial
 
     with SessionLocal() as session:
+        resume_version = current_resume_version(session, request)
         enabled = get_bool(session, "agent_enabled", True)
         latest_run = session.scalar(select(RunLog).order_by(desc(RunLog.started_at)).limit(1))
         total_jobs = session.scalar(select(func.count(Job.id))) or 0
         strong = session.scalar(
             select(func.count(Evaluation.id)).where(
                 owner_clause(Evaluation.user_id, request),
+                Evaluation.resume_version == resume_version,
                 Evaluation.fit_score >= 75,
             )
         ) or 0
@@ -384,6 +402,7 @@ def dashboard(request: Request, sort: str = "newest_posted"):
                 and_(
                     Evaluation.job_id == Job.id,
                     owner_clause(Evaluation.user_id, request),
+                    Evaluation.resume_version == resume_version,
                 ),
                 isouter=True,
             )
@@ -685,6 +704,7 @@ def jobs_page(
     if denial:
         return denial
     with SessionLocal() as session:
+        resume_version = current_resume_version(session, request)
         stmt = (
             select(Job, Evaluation, UserJobState)
             .join(
@@ -692,6 +712,7 @@ def jobs_page(
                 and_(
                     Evaluation.job_id == Job.id,
                     owner_clause(Evaluation.user_id, request),
+                    Evaluation.resume_version == resume_version,
                 ),
                 isouter=True,
             )
@@ -756,6 +777,8 @@ def application_page(job_id: str, request: Request):
             .where(
                 ApplicationPackage.job_id == job_id,
                 owner_clause(ApplicationPackage.user_id, request),
+                ApplicationPackage.candidate_profile_version
+                == current_resume_version(session, request),
             )
             .order_by(desc(ApplicationPackage.version))
             .limit(1)
@@ -826,6 +849,16 @@ def build_application_package(job_id: str, request: Request):
         if not job:
             return HTMLResponse("Job not found", status_code=404)
 
+        candidate_profile = session.get(
+            CandidateProfile,
+            current_user_id(request),
+        ) if current_user_id(request) else None
+        if not candidate_profile or not candidate_profile.is_active:
+            return HTMLResponse(
+                "An active administrator-approved candidate profile is required.",
+                status_code=409,
+            )
+
         job_data = {
             "title": job.title,
             "company": job.company,
@@ -837,7 +870,10 @@ def build_application_package(job_id: str, request: Request):
         }
 
         try:
-            result = build_application_materials(job_data)
+            result = build_application_materials(
+                job_data,
+                profile=candidate_profile.profile_data,
+            )
         except Exception:
             return HTMLResponse(
                 "Application package generation failed. Please try again.",
@@ -855,6 +891,7 @@ def build_application_package(job_id: str, request: Request):
         now = datetime.now(timezone.utc)
         package = ApplicationPackage(
             user_id=current_user_id(request),
+            candidate_profile_version=candidate_profile.resume_version,
             job_id=job_id,
             version=current_version + 1,
             tailored_resume=result["tailored_resume"],
@@ -918,6 +955,7 @@ def create_user(
         )
         session.add(user)
         session.commit()
+        ensure_user_profile_records(session, user)
         record_audit(
             session,
             "user_created",
@@ -952,6 +990,95 @@ def change_user_status(user_id: str, request: Request, status: str = Form(...)):
                 detail={"status": status},
             )
     return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.get("/admin/users/{user_id}/profile", response_class=HTMLResponse)
+def user_profile_page(user_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        profile, preference = ensure_user_profile_records(session, user)
+        profile_json = json.dumps(profile.profile_data, indent=2, ensure_ascii=False)
+    return templates.TemplateResponse(request, "user_profile.html", {
+        "user": user,
+        "profile": profile,
+        "preference": preference,
+        "profile_json": profile_json,
+        "error": None,
+    })
+
+
+@app.post("/admin/users/{user_id}/profile", response_class=HTMLResponse)
+def save_user_profile(
+    user_id: str,
+    request: Request,
+    profile_json: str = Form(...),
+    notification_email: str = Form(...),
+    digest_time: str = Form("17:05"),
+    is_active: str | None = Form(None),
+    immediate_alerts: str | None = Form(None),
+    daily_digest: str | None = Form(None),
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    try:
+        profile_data = json.loads(profile_json)
+    except json.JSONDecodeError as exc:
+        profile_data = None
+        errors = [f"Profile JSON is invalid near line {exc.lineno}: {exc.msg}"]
+    else:
+        errors = validate_candidate_profile(profile_data)
+    recipient = normalize_email_address(notification_email)
+    if not recipient:
+        errors.append("Notification email must be a valid single email address.")
+    try:
+        datetime.strptime(digest_time, "%H:%M")
+    except ValueError:
+        errors.append("Digest time must be a valid time.")
+
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        profile, preference = ensure_user_profile_records(session, user)
+        if errors:
+            return templates.TemplateResponse(request, "user_profile.html", {
+                "user": user,
+                "profile": profile,
+                "preference": preference,
+                "profile_json": profile_json,
+                "error": " ".join(errors),
+            }, status_code=400)
+
+        if profile.profile_data != profile_data:
+            profile.version += 1
+            profile.resume_version = f"profile-v{profile.version}"
+            profile.profile_data = profile_data
+        profile.is_active = bool(is_active)
+        profile.updated_at = datetime.now(timezone.utc)
+        preference.notification_email = recipient
+        preference.digest_time = digest_time
+        preference.immediate_alerts = bool(immediate_alerts)
+        preference.daily_digest = bool(daily_digest)
+        preference.updated_at = datetime.now(timezone.utc)
+        session.commit()
+        record_audit(
+            session,
+            "candidate_profile_updated",
+            actor_user_id=current_user_id(request),
+            target_user_id=user.id,
+            request=request,
+            detail={"active": profile.is_active, "version": profile.version},
+        )
+    return RedirectResponse(
+        f"/admin/users/{user_id}/profile?message=Profile+saved",
+        status_code=303,
+    )
 
 
 @app.get("/sources", response_class=HTMLResponse)

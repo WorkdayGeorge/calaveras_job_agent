@@ -170,6 +170,7 @@ class ApplicationPackage(Base):
         default=uuid_str,
     )
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    candidate_profile_version: Mapped[str | None] = mapped_column(String(100))
     job_id: Mapped[str] = mapped_column(
         ForeignKey("jobs.id"),
         nullable=False,
@@ -227,5 +228,30 @@ class UserJobState(Base):
     outcome: Mapped[str | None] = mapped_column(String(50))
     application_url: Mapped[str | None] = mapped_column(Text)
     resume_asset_id: Mapped[str | None] = mapped_column(ForeignKey("resume_assets.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CandidateProfile(Base):
+    __tablename__ = "candidate_profiles"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    profile_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    resume_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    notification_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    immediate_alerts: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    daily_digest: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    digest_time: Mapped[str] = mapped_column(String(5), nullable=False, default="17:05")
+    last_digest_date: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
