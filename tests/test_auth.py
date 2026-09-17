@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 from job_agent.models import Base, User
 from web.auth import (
+    bootstrap_admin,
     consume_token,
     hash_password,
     issue_token,
@@ -83,3 +84,18 @@ def test_new_token_invalidates_earlier_unused_token():
     issue_token(session, user, "login_otp", "654321", minutes=10)
     assert consume_token(session, user, "login_otp", "123456") is False
     assert consume_token(session, user, "login_otp", "654321") is True
+
+
+def test_configured_admin_email_updates_existing_bootstrap_account(monkeypatch):
+    session = make_session()
+    user = make_user(session)
+    user.role = "administrator"
+    session.commit()
+    monkeypatch.setenv("ADMIN_EMAIL", "MonteGeorgeIII@Gmail.com")
+    monkeypatch.setenv("ADMIN_DISPLAY_NAME", "Monte George")
+
+    admin = bootstrap_admin(session)
+
+    assert admin.id == user.id
+    assert admin.email == "montegeorgeiii@gmail.com"
+    assert admin.display_name == "Monte George"

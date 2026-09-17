@@ -60,6 +60,14 @@ def find_user_by_email(session, email: str | None) -> User | None:
 def bootstrap_admin(session) -> User | None:
     existing = session.scalar(select(User).where(User.role == "administrator").limit(1))
     if existing:
+        configured_email = normalize_login_email(env("ADMIN_EMAIL"))
+        if configured_email and configured_email != existing.email:
+            collision = session.scalar(select(User).where(User.email == configured_email))
+            if not collision:
+                existing.email = configured_email
+                existing.display_name = env("ADMIN_DISPLAY_NAME", existing.display_name)
+                existing.updated_at = datetime.now(timezone.utc)
+                session.commit()
         return existing
 
     email = normalize_login_email(env("ADMIN_EMAIL") or env("ALERT_EMAIL_TO"))
