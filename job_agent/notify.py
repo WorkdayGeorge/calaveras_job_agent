@@ -106,9 +106,12 @@ def email_notify(
 def email_high_priority_digest(
     items: list[tuple[dict, dict]],
     recipient: str | None = None,
+    recent_immediate_items: list[tuple[dict, dict]] | None = None,
+    immediate_alert_score: int | None = None,
 ) -> tuple[bool, str]:
-    if not items:
-        return False, "no pending digest items"
+    recent_immediate_items = recent_immediate_items or []
+    if not items and not recent_immediate_items:
+        return False, "no digest items"
 
     if str(env("SMTP_ENABLED", "false")).lower() not in {"1", "true", "yes", "on"}:
         return False, "SMTP disabled"
@@ -126,23 +129,60 @@ def email_high_priority_digest(
     lines = [
         "High-Priority Daily Job Digest",
         "",
+        "Pending High-Priority Jobs",
+        "",
         f"These {len(items)} strong-fit job(s) had an unverified posting time and were held for the daily digest.",
         "",
     ]
 
-    for index, (job, evaluation) in enumerate(items, start=1):
-        lines.extend([
-            f"{index}. {job['title']}",
-            job["company"],
-            job.get("location") or "Location not supplied",
-            f"Fit: {evaluation['fit_score']}/100 — {evaluation['classification']}",
-            f"Recommendation: {evaluation['recommendation']}",
-            f"Apply: {job['apply_url']}",
-            "",
-        ])
+    if items:
+        for index, (job, evaluation) in enumerate(items, start=1):
+            lines.extend([
+                f"{index}. {job['title']}",
+                job["company"],
+                job.get("location") or "Location not supplied",
+                f"Fit: {evaluation['fit_score']}/100 — {evaluation['classification']}",
+                f"Recommendation: {evaluation['recommendation']}",
+                f"Apply: {job['apply_url']}",
+                "",
+            ])
+    else:
+        lines.extend(["No newly queued jobs for today's digest.", ""])
+
+    threshold_text = (
+        str(immediate_alert_score)
+        if immediate_alert_score is not None
+        else "the configured"
+    )
+    lines.extend([
+        "Last 30 Days — Immediate Alert Threshold",
+        "",
+        f"These {len(recent_immediate_items)} job(s) evaluated in the last 30 days met or exceeded {threshold_text}/100.",
+        "",
+    ])
+
+    if recent_immediate_items:
+        for index, (job, evaluation) in enumerate(
+            recent_immediate_items, start=1
+        ):
+            lines.extend([
+                f"{index}. {job['title']}",
+                job["company"],
+                job.get("location") or "Location not supplied",
+                f"Fit: {evaluation['fit_score']}/100 — {evaluation['classification']}",
+                f"Recommendation: {evaluation['recommendation']}",
+                f"Evaluated: {evaluation.get('evaluated_at') or 'Date unavailable'}",
+                f"Apply: {job['apply_url']}",
+                "",
+            ])
+    else:
+        lines.extend(["No qualifying jobs in the last 30 days.", ""])
 
     msg = EmailMessage()
-    msg["Subject"] = f"High-Priority Job Digest — {len(items)} job(s)"
+    msg["Subject"] = (
+        "High-Priority Job Digest — "
+        f"{len(items)} new, {len(recent_immediate_items)} recent"
+    )
     msg["From"] = from_addr
     msg["To"] = to_addr
     msg.set_content("\n".join(lines))

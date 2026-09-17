@@ -1,7 +1,7 @@
 \
 from __future__ import annotations
 
-from datetime import datetime, timezone, time
+from datetime import datetime, timezone, time, timedelta
 from zoneinfo import ZoneInfo
 
 from .config import load_settings, env
@@ -197,7 +197,19 @@ def process_high_priority_digest(session) -> dict:
         .order_by(Evaluation.fit_score.desc(), Job.first_seen_at.desc())
     ).all()
 
-    if not rows:
+    immediate_alert_score = get_int(session, "immediate_alert_score", 75)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    recent_rows = session.execute(
+        select(Job, Evaluation)
+        .join(Evaluation, Evaluation.job_id == Job.id)
+        .where(
+            Evaluation.evaluated_at >= cutoff,
+            Evaluation.fit_score >= immediate_alert_score,
+        )
+        .order_by(Evaluation.fit_score.desc(), Evaluation.evaluated_at.desc())
+    ).all()
+
+    if not rows and not recent_rows:
         set_setting(session, "high_priority_digest_last_date", today)
         return {"status": "no items", "count": 0}
 
@@ -209,11 +221,25 @@ def process_high_priority_digest(session) -> dict:
             "recommendation": evaluation.recommendation,
         }))
 
+    recent_immediate_items = []
+    for job, evaluation in recent_rows:
+        recent_immediate_items.append((job_to_dict(job), {
+            "fit_score": evaluation.fit_score,
+            "classification": evaluation.classification,
+            "recommendation": evaluation.recommendation,
+            "evaluated_at": evaluation.evaluated_at.isoformat(),
+        }))
+
     recipient = (
         get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", ""))
         or env("ALERT_EMAIL_TO", "")
     )
-    sent, detail = email_high_priority_digest(items, recipient=recipient)
+    sent, detail = email_high_priority_digest(
+        items,
+        recipient=recipient,
+        recent_immediate_items=recent_immediate_items,
+        immediate_alert_score=immediate_alert_score,
+    )
     if not sent:
         print(f"High-priority digest send failed: {detail}")
         return {"status": "failed", "detail": detail}
@@ -227,8 +253,16 @@ def process_high_priority_digest(session) -> dict:
 
     set_setting(session, "high_priority_digest_last_date", today)
     session.commit()
-    print(f"High-priority digest sent: {len(rows)} job(s).")
-    return {"status": "sent", "count": len(rows)}
+    print(
+        "High-priority digest sent: "
+        f"{len(rows)} pending job(s), "
+        f"{len(recent_rows)} recent threshold job(s)."
+    )
+    return {
+        "status": "sent",
+        "count": len(rows),
+        "recent_immediate_count": len(recent_rows),
+    }
 
 def run_once(force: bool = False) -> dict:
     yaml_settings = load_settings()
