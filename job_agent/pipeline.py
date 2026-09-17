@@ -17,6 +17,8 @@ from .providers.calcareers import CalCareersProvider
 from .providers.commonspirit import CommonSpiritProvider
 from .providers.bear_valley import BearValleyProvider
 from .providers.ccwd import CCWDProvider
+from .providers.amador_water import AmadorWaterAgencyProvider
+from .providers.tuolumne_utilities import TuolumneUtilitiesProvider
 from .providers.edjoin_calaveras import EDJoinCalaverasProvider
 from .providers.edjoin_amador import EDJoinAmadorProvider
 from .providers.edjoin_tuolumne import EDJoinTuolumneProvider
@@ -54,6 +56,10 @@ def get_providers():
             providers.append(BearValleyProvider())
         elif name == "ccwd":
             providers.append(CCWDProvider())
+        elif name == "amador_water":
+            providers.append(AmadorWaterAgencyProvider())
+        elif name == "tuolumne_utilities":
+            providers.append(TuolumneUtilitiesProvider())
         elif name == "edjoin_calaveras":
             providers.append(EDJoinCalaverasProvider())
         elif name == "edjoin_amador":

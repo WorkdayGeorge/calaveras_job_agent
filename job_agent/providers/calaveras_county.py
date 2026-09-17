@@ -16,6 +16,7 @@ class CalaverasCountyProvider(JobProvider):
         "SearchEngine/JobsFeed?agency=calaverascounty"
     )
     COUNTY_NAME = "Calaveras County"
+    COMPANY_NAME = "Calaveras County"
     SOURCE_KEY = "calaveras_county"
 
     NS = {
@@ -134,7 +135,7 @@ class CalaverasCountyProvider(JobProvider):
                 RawJob(
                     provider_job_id=job_id or job_number or link,
                     title=title,
-                    company=self.COUNTY_NAME,
+                    company=self.COMPANY_NAME,
                     location=location,
                     employment_type=self._job_text(item, "jobType"),
                     description=combined_description or description,

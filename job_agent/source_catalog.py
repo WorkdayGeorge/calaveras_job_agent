@@ -76,6 +76,26 @@ JOB_SOURCES = [
         ],
     },
     {
+        "key": "amador_water",
+        "name": "Amador Water Agency",
+        "type": "Local public agency",
+        "description": "Official Amador Water Agency employment openings for Amador County.",
+        "links": [
+            {"label": "Amador Water Agency Careers", "url": "https://amadorwater.gov/careers/current-job-openings/"},
+            {"label": "Amador Water Agency GovernmentJobs", "url": "https://www.governmentjobs.com/careers/amadorwater"},
+        ],
+    },
+    {
+        "key": "tuolumne_utilities",
+        "name": "Tuolumne Utilities District",
+        "type": "Local public agency",
+        "description": "Official Tuolumne Utilities District water and wastewater employment openings for Tuolumne County.",
+        "links": [
+            {"label": "TUD Job Openings", "url": "https://tudwater.com/careers/job-openings/"},
+            {"label": "TUD GovernmentJobs", "url": "https://www.governmentjobs.com/careers/tudwater"},
+        ],
+    },
+    {
         "key": "edjoin_calaveras",
         "name": "EDJOIN - Calaveras County Public Schools",
         "type": "Education",
