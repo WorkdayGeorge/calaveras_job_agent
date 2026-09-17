@@ -28,6 +28,22 @@
   {% endif %}
 </div>
 
+<div class="card" style="margin-top:18px;">
+  <h2 style="margin-top:0;">Application Tracking</h2>
+  <form method="post" action="/jobs/{{ job.id }}/application-status">
+    <div class="row">
+      <div><label>Status</label><select name="status">{% for s in ["new","reviewed","interested","applied","interview","rejected","hired","ignore","expired"] %}<option value="{{ s }}" {% if (state.status if state else "new") == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+      <div><label>Applied</label><input type="datetime-local" name="applied_at" value="{{ state.applied_at|pacific_datetime_input if state else '' }}"></div>
+      <div><label>Follow-up</label><input type="datetime-local" name="follow_up_at" value="{{ state.follow_up_at|pacific_datetime_input if state else '' }}"></div>
+      <div><label>Interview</label><input type="datetime-local" name="interview_at" value="{{ state.interview_at|pacific_datetime_input if state else '' }}"></div>
+    </div>
+    <label>Application URL</label><input type="url" name="application_url" value="{{ state.application_url if state and state.application_url else job.apply_url }}">
+    <label>Outcome</label><input name="outcome" value="{{ state.outcome if state and state.outcome else '' }}" placeholder="Interview requested, offer, declined, etc.">
+    <label>Notes</label><textarea name="notes" rows="5" placeholder="Contacts, follow-up details, or application notes">{{ state.notes if state and state.notes else '' }}</textarea>
+    <button class="btn" style="margin-top:14px">Save application details</button>
+  </form>
+</div>
+
 {% if not package %}
 <div class="card" style="margin-top:18px;">
   <h2 style="margin-top:0;">Application Package</h2>

@@ -2,9 +2,11 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Resume Manager</h1>
+<form method="get" action="/resumes" class="card" style="margin-bottom:16px"><label>User</label><select name="user_id" onchange="this.form.submit()">{% for user in users %}<option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select></form>
 <div class="card">
 <p>Upload the current focused accounting/technical resume or the full work-history resume. In Google Cloud, configure <code>GCS_BUCKET</code> so uploads persist.</p>
 <form method="post" action="/resumes/upload" enctype="multipart/form-data">
+<input type="hidden" name="user_id" value="{{ selected_user_id or '' }}">
 <div class="row">
 <div><label>Resume type</label><select name="resume_type"><option value="focused">Focused Accounting / Technical</option><option value="all-work-experience">All Work Experience</option></select></div>
 <div><label>DOCX or PDF</label><input type="file" name="resume" accept=".docx,.pdf" required></div>

@@ -67,9 +67,10 @@ The production-safe default remains the original single-administrator login:
 AUTH_MODE=legacy
 ```
 
-Database-backed accounts are present but should only be enabled after the
-per-user resume, evaluation, notification, and application-state migration is
-complete. Enabling it early would give users access to shared legacy records.
+Database-backed accounts and per-user ownership are present, but database
+authentication should only be enabled after user-specific candidate profiles
+are connected to the evaluator and application builder. Enabling it early would
+score other users against the built-in Joshua profile.
 
 Before enabling database authentication, configure SMTP and set:
 
@@ -85,6 +86,13 @@ the existing `ADMIN_PASSWORD`. The administrator password must contain at least
 Each user receives an administrator-assigned temporary password, verifies a
 six-digit email code at sign-in, and must replace the temporary password before
 using the application.
+
+Job postings remain shared and deduplicated. Evaluations, notifications,
+resume assets, application packages, and job/application status belong to one
+user. Existing legacy records are assigned to the first administrator
+idempotently. The Resume Manager lets the administrator select the user whose
+resume is being managed. Application Tracking records status, applied date,
+follow-up date, interview date, outcome, URL, and private notes.
 
 ## Worker only
 

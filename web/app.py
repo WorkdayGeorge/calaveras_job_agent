@@ -11,10 +11,13 @@ from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, and_
 
 from job_agent.db import init_db, SessionLocal
-from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage, User
+from job_agent.models import (
+    Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage,
+    User, UserJobState,
+)
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
 from job_agent.config import load_settings, env
@@ -22,6 +25,7 @@ from job_agent.notify import email_notify, email_text, normalize_email_address
 from job_agent.settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting
 )
+from job_agent.user_data import assign_legacy_records_to_admin, get_or_create_job_state
 
 
 
@@ -67,6 +71,24 @@ def pacific_time(value):
     )
 
 templates.env.filters["pacific_time"] = pacific_time
+
+def pacific_datetime_input(value):
+    if value is None:
+        return ""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(PACIFIC_TZ).strftime("%Y-%m-%dT%H:%M")
+
+templates.env.filters["pacific_datetime_input"] = pacific_datetime_input
+
+def parse_pacific_datetime(value: str | None):
+    if not value:
+        return None
+    try:
+        local = datetime.fromisoformat(value)
+        return local.replace(tzinfo=PACIFIC_TZ).astimezone(timezone.utc)
+    except ValueError:
+        return None
 
 def job_sort_order(sort_by):
     """Return SQLAlchemy ORDER BY expressions for job listings."""
@@ -115,6 +137,13 @@ def authed(request: Request) -> bool:
 def admin_user(request: Request) -> bool:
     return authed(request) and request.session.get("role", "administrator") == "administrator"
 
+def current_user_id(request: Request) -> str | None:
+    return request.session.get("user_id")
+
+def owner_clause(column, request: Request):
+    user_id = current_user_id(request)
+    return column == user_id if user_id else column.is_(None)
+
 def require_auth(request: Request):
     if not authed(request):
         return RedirectResponse("/login", status_code=303)
@@ -135,8 +164,8 @@ def startup():
     init_db()
     with SessionLocal() as session:
         seed_settings(session, load_settings())
-        if database_auth_enabled():
-            bootstrap_admin(session)
+        admin = bootstrap_admin(session)
+        assign_legacy_records_to_admin(session, admin)
 
 @app.get("/health")
 def health():
@@ -196,8 +225,14 @@ def login(request: Request, password: str = Form(...), email: str = Form("")):
 
     configured = env("ADMIN_PASSWORD", "")
     if configured and secrets.compare_digest(password, configured):
+        with SessionLocal() as session:
+            admin = bootstrap_admin(session)
+            assign_legacy_records_to_admin(session, admin)
         request.session["authenticated"] = True
         request.session["role"] = "administrator"
+        if admin:
+            request.session["user_id"] = admin.id
+            request.session["email"] = admin.email
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(
         request,
@@ -337,11 +372,29 @@ def dashboard(request: Request, sort: str = "newest_posted"):
         latest_run = session.scalar(select(RunLog).order_by(desc(RunLog.started_at)).limit(1))
         total_jobs = session.scalar(select(func.count(Job.id))) or 0
         strong = session.scalar(
-            select(func.count(Evaluation.id)).where(Evaluation.fit_score >= 75)
+            select(func.count(Evaluation.id)).where(
+                owner_clause(Evaluation.user_id, request),
+                Evaluation.fit_score >= 75,
+            )
         ) or 0
         recent = session.execute(
-            select(Job, Evaluation)
-            .join(Evaluation, Evaluation.job_id == Job.id, isouter=True)
+            select(Job, Evaluation, UserJobState)
+            .join(
+                Evaluation,
+                and_(
+                    Evaluation.job_id == Job.id,
+                    owner_clause(Evaluation.user_id, request),
+                ),
+                isouter=True,
+            )
+            .join(
+                UserJobState,
+                and_(
+                    UserJobState.job_id == Job.id,
+                    UserJobState.user_id == current_user_id(request),
+                ),
+                isouter=True,
+            )
             .order_by(*job_sort_order(sort))
             .limit(8)
         ).all()
@@ -633,12 +686,30 @@ def jobs_page(
         return denial
     with SessionLocal() as session:
         stmt = (
-            select(Job, Evaluation)
-            .join(Evaluation, Evaluation.job_id == Job.id, isouter=True)
+            select(Job, Evaluation, UserJobState)
+            .join(
+                Evaluation,
+                and_(
+                    Evaluation.job_id == Job.id,
+                    owner_clause(Evaluation.user_id, request),
+                ),
+                isouter=True,
+            )
+            .join(
+                UserJobState,
+                and_(
+                    UserJobState.job_id == Job.id,
+                    UserJobState.user_id == current_user_id(request),
+                ),
+                isouter=True,
+            )
             .order_by(*job_sort_order(sort))
         )
         if status:
-            stmt = stmt.where(Job.status == status)
+            if current_user_id(request):
+                stmt = stmt.where(UserJobState.status == status)
+            else:
+                stmt = stmt.where(Job.status == status)
         rows = session.execute(stmt.limit(250)).all()
     return templates.TemplateResponse(
         request,
@@ -657,7 +728,15 @@ def set_job_status(job_id: str, request: Request, status: str = Form(...)):
     with SessionLocal() as session:
         job = session.get(Job, job_id)
         if job:
-            job.status = status
+            user_id = current_user_id(request)
+            if user_id:
+                state = get_or_create_job_state(session, user_id, job)
+                state.status = status
+                state.updated_at = datetime.now(timezone.utc)
+                if status == "applied" and not state.applied_at:
+                    state.applied_at = datetime.now(timezone.utc)
+            else:
+                job.status = status
             session.commit()
     return RedirectResponse("/jobs", status_code=303)
 
@@ -674,16 +753,65 @@ def application_page(job_id: str, request: Request):
 
         package = session.scalar(
             select(ApplicationPackage)
-            .where(ApplicationPackage.job_id == job_id)
+            .where(
+                ApplicationPackage.job_id == job_id,
+                owner_clause(ApplicationPackage.user_id, request),
+            )
             .order_by(desc(ApplicationPackage.version))
             .limit(1)
         )
+        state = session.scalar(
+            select(UserJobState).where(
+                UserJobState.user_id == current_user_id(request),
+                UserJobState.job_id == job_id,
+            )
+        ) if current_user_id(request) else None
 
     return templates.TemplateResponse(
         request,
         "application.html",
-        {"job": job, "package": package}
+        {"job": job, "package": package, "state": state}
     )
+
+
+@app.post("/jobs/{job_id}/application-status")
+def save_application_status(
+    job_id: str,
+    request: Request,
+    status: str = Form(...),
+    notes: str = Form(""),
+    applied_at: str = Form(""),
+    follow_up_at: str = Form(""),
+    interview_at: str = Form(""),
+    outcome: str = Form(""),
+    application_url: str = Form(""),
+):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    user_id = current_user_id(request)
+    if not user_id:
+        return HTMLResponse("Account ownership is required", status_code=409)
+    allowed = {"new", "reviewed", "interested", "applied", "interview", "rejected", "hired", "ignore", "expired"}
+    if status not in allowed:
+        return JSONResponse({"error": "invalid status"}, status_code=400)
+    with SessionLocal() as session:
+        job = session.get(Job, job_id)
+        if not job:
+            return HTMLResponse("Job not found", status_code=404)
+        state = get_or_create_job_state(session, user_id, job)
+        state.status = status
+        state.notes = notes.strip() or None
+        state.applied_at = parse_pacific_datetime(applied_at)
+        state.follow_up_at = parse_pacific_datetime(follow_up_at)
+        state.interview_at = parse_pacific_datetime(interview_at)
+        state.outcome = outcome.strip() or None
+        state.application_url = application_url.strip() or job.apply_url
+        state.updated_at = datetime.now(timezone.utc)
+        if status == "applied" and not state.applied_at:
+            state.applied_at = datetime.now(timezone.utc)
+        session.commit()
+    return RedirectResponse(f"/jobs/{job_id}/application", status_code=303)
 
 
 
@@ -718,11 +846,15 @@ def build_application_package(job_id: str, request: Request):
 
         current_version = session.scalar(
             select(func.max(ApplicationPackage.version))
-            .where(ApplicationPackage.job_id == job_id)
+            .where(
+                ApplicationPackage.job_id == job_id,
+                owner_clause(ApplicationPackage.user_id, request),
+            )
         ) or 0
 
         now = datetime.now(timezone.utc)
         package = ApplicationPackage(
+            user_id=current_user_id(request),
             job_id=job_id,
             version=current_version + 1,
             tailored_resume=result["tailored_resume"],
@@ -850,24 +982,31 @@ def runs_page(request: Request):
     )
 
 @app.get("/resumes", response_class=HTMLResponse)
-def resumes_page(request: Request):
+def resumes_page(request: Request, user_id: str | None = None):
     denial = require_admin(request)
     if denial:
         return denial
     with SessionLocal() as session:
+        users = session.scalars(select(User).order_by(User.display_name)).all()
+        selected_user_id = user_id or current_user_id(request)
+        if selected_user_id and not session.get(User, selected_user_id):
+            selected_user_id = current_user_id(request)
         assets = session.scalars(
-            select(ResumeAsset).order_by(desc(ResumeAsset.uploaded_at))
+            select(ResumeAsset)
+            .where(ResumeAsset.user_id == selected_user_id)
+            .order_by(desc(ResumeAsset.uploaded_at))
         ).all()
     return templates.TemplateResponse(
         request,
         "resumes.html",
-        {"assets": assets}
+        {"assets": assets, "users": users, "selected_user_id": selected_user_id}
     )
 
 @app.post("/resumes/upload")
 async def upload_resume(
     request: Request,
     resume_type: str = Form(...),
+    user_id: str = Form(""),
     resume: UploadFile = File(...),
 ):
     denial = require_admin(request)
@@ -884,10 +1023,14 @@ async def upload_resume(
     if len(content) > 10 * 1024 * 1024:
         return JSONResponse({"error": "resume exceeds 10 MB"}, status_code=400)
 
-    uri = save_resume(filename, content, resume_type)
     with SessionLocal() as session:
+        target_user_id = user_id or current_user_id(request)
+        if not target_user_id or not session.get(User, target_user_id):
+            return JSONResponse({"error": "invalid user"}, status_code=400)
+        uri = save_resume(filename, content, resume_type, target_user_id)
         previous = session.scalars(
             select(ResumeAsset).where(
+                ResumeAsset.user_id == target_user_id,
                 ResumeAsset.resume_type == resume_type,
                 ResumeAsset.is_current.is_(True),
             )
@@ -895,6 +1038,7 @@ async def upload_resume(
         for p in previous:
             p.is_current = False
         session.add(ResumeAsset(
+            user_id=target_user_id,
             resume_type=resume_type,
             filename=filename,
             storage_uri=uri,
@@ -902,4 +1046,4 @@ async def upload_resume(
             is_current=True,
         ))
         session.commit()
-    return RedirectResponse("/resumes", status_code=303)
+    return RedirectResponse(f"/resumes?user_id={target_user_id}", status_code=303)

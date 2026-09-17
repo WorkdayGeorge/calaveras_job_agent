@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from .config import load_settings, env
 from .db import init_db, SessionLocal
 from .evaluator import load_candidate_profile, evaluate_job
-from .models import Job, Evaluation, Notification, RunLog
+from .models import Job, Evaluation, Notification, RunLog, User
 from .normalize import normalize_job
 from .notify import notification_bucket, console_notify, email_notify, email_high_priority_digest
 from .providers.demo import DemoProvider
@@ -189,11 +189,21 @@ def process_high_priority_digest(session) -> dict:
     if last_date == today:
         return {"status": "already_processed"}
 
+    owner_id = session.scalar(
+        select(User.id)
+        .where(User.role == "administrator", User.status == "active")
+        .order_by(User.created_at)
+        .limit(1)
+    )
+
     rows = session.execute(
         select(Notification, Job, Evaluation)
         .join(Job, Notification.job_id == Job.id)
         .join(Evaluation, Notification.evaluation_id == Evaluation.id)
-        .where(Notification.status == "pending_digest")
+        .where(
+            Notification.status == "pending_digest",
+            Notification.user_id == owner_id,
+        )
         .order_by(Evaluation.fit_score.desc(), Job.first_seen_at.desc())
     ).all()
 
@@ -203,6 +213,7 @@ def process_high_priority_digest(session) -> dict:
         select(Job, Evaluation)
         .join(Evaluation, Evaluation.job_id == Job.id)
         .where(
+            Evaluation.user_id == owner_id,
             Evaluation.evaluated_at >= cutoff,
             Evaluation.fit_score >= immediate_alert_score,
         )
@@ -271,6 +282,12 @@ def run_once(force: bool = False) -> dict:
 
     with SessionLocal() as session:
         seed_settings(session, yaml_settings)
+        owner_id = session.scalar(
+            select(User.id)
+            .where(User.role == "administrator", User.status == "active")
+            .order_by(User.created_at)
+            .limit(1)
+        )
 
         if not force and not get_bool(session, "agent_enabled", True):
             summary = {"status": "paused", "found": 0, "new_local_jobs": 0, "evaluated": 0, "alerts": 0}
@@ -355,7 +372,7 @@ def run_once(force: bool = False) -> dict:
                         if job.id in processed_job_ids:
                             continue
 
-                        if evaluation_exists(session, job.id, RESUME_VERSION):
+                        if evaluation_exists(session, job.id, RESUME_VERSION, owner_id):
                             processed_job_ids.add(job.id)
                             continue
 
@@ -364,6 +381,7 @@ def run_once(force: bool = False) -> dict:
                         job_dict = job_to_dict(job)
                         result = evaluate_job(job_dict, profile)
                         evaluation = Evaluation(
+                            user_id=owner_id,
                             job_id=job.id,
                             resume_version=RESUME_VERSION,
                             fit_score=int(result["fit_score"]),
@@ -392,6 +410,7 @@ def run_once(force: bool = False) -> dict:
                         bucket = notification_bucket(job_dict, result, settings)
                         if bucket == "high_priority_digest":
                             session.add(Notification(
+                                user_id=owner_id,
                                 job_id=job.id,
                                 evaluation_id=evaluation.id,
                                 channel="digest",
@@ -410,6 +429,7 @@ def run_once(force: bool = False) -> dict:
                                 recipient=settings.get("alert_email_to"),
                             )
                             session.add(Notification(
+                                user_id=owner_id,
                                 job_id=job.id,
                                 evaluation_id=evaluation.id,
                                 channel="email" if sent else "console",

@@ -79,9 +79,12 @@ class Job(Base):
 
 class Evaluation(Base):
     __tablename__ = "evaluations"
-    __table_args__ = (UniqueConstraint("job_id", "resume_version", name="uq_job_resume_version"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", "resume_version", name="uq_user_job_resume_version"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), nullable=False)
     resume_version: Mapped[str] = mapped_column(String(50), nullable=False)
     fit_score: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -100,6 +103,7 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), nullable=False)
     evaluation_id: Mapped[str] = mapped_column(ForeignKey("evaluations.id"), nullable=False)
     channel: Mapped[str] = mapped_column(String(50), default="console")
@@ -142,6 +146,7 @@ class ResumeAsset(Base):
     __tablename__ = "resume_assets"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     resume_type: Mapped[str] = mapped_column(String(50), nullable=False)  # focused | all-work-experience
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_uri: Mapped[str] = mapped_column(Text, nullable=False)
@@ -152,9 +157,10 @@ class ApplicationPackage(Base):
     __tablename__ = "application_packages"
     __table_args__ = (
         UniqueConstraint(
+            "user_id",
             "job_id",
             "version",
-            name="uq_application_package_job_version",
+            name="uq_user_application_package_job_version",
         ),
     )
 
@@ -163,6 +169,7 @@ class ApplicationPackage(Base):
         primary_key=True,
         default=uuid_str,
     )
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     job_id: Mapped[str] = mapped_column(
         ForeignKey("jobs.id"),
         nullable=False,
@@ -201,3 +208,24 @@ class ApplicationPackage(Base):
         DateTime(timezone=True),
         nullable=False,
     )
+
+
+class UserJobState(Base):
+    __tablename__ = "user_job_states"
+    __table_args__ = (
+        UniqueConstraint("user_id", "job_id", name="uq_user_job_state"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="new")
+    notes: Mapped[str | None] = mapped_column(Text)
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    follow_up_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    interview_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome: Mapped[str | None] = mapped_column(String(50))
+    application_url: Mapped[str | None] = mapped_column(Text)
+    resume_asset_id: Mapped[str | None] = mapped_column(ForeignKey("resume_assets.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

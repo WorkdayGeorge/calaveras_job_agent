@@ -21,7 +21,7 @@
 </form>
 <table>
 <tr><th>Job</th><th>Posted</th><th>Fit</th><th>Recommendation</th><th>Status</th><th>Apply</th></tr>
-{% for job, ev in rows %}
+{% for job, ev, state in rows %}
 <tr>
 <td><strong>{{ job.title }}</strong><br>{{ job.company }}<br><span class="muted">{{ job.location or "—" }}</span></td>
 <td>{{ job.posted_at|pacific_time if job.posted_at else "Unverified" }}<br><span class="muted">{{ job.freshness_status }}</span></td>
@@ -31,7 +31,7 @@
 <form method="post" action="/jobs/{{ job.id }}/status">
 <select name="status" onchange="this.form.submit()">
 {% for s in ["new","reviewed","interested","applied","interview","rejected","hired","ignore","expired"] %}
-<option value="{{ s }}" {% if job.status == s %}selected{% endif %}>{{ s }}</option>
+<option value="{{ s }}" {% if (state.status if state else job.status) == s %}selected{% endif %}>{{ s }}</option>
 {% endfor %}
 </select></form>
 </td>

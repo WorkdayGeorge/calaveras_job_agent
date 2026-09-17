@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from .config import env
 from .db import SessionLocal, init_db
-from .models import Evaluation, Job, Notification
+from .models import Evaluation, Job, Notification, User
 from .notify import email_high_priority_digest
 from .pipeline import job_to_dict
 from .settings_store import get_int, get_setting
@@ -17,11 +17,20 @@ def send_digest_preview() -> dict:
     init_db()
 
     with SessionLocal() as session:
+        owner_id = session.scalar(
+            select(User.id)
+            .where(User.role == "administrator", User.status == "active")
+            .order_by(User.created_at)
+            .limit(1)
+        )
         pending_rows = session.execute(
             select(Notification, Job, Evaluation)
             .join(Job, Notification.job_id == Job.id)
             .join(Evaluation, Notification.evaluation_id == Evaluation.id)
-            .where(Notification.status == "pending_digest")
+            .where(
+                Notification.status == "pending_digest",
+                Notification.user_id == owner_id,
+            )
             .order_by(Evaluation.fit_score.desc(), Job.first_seen_at.desc())
         ).all()
 
@@ -31,6 +40,7 @@ def send_digest_preview() -> dict:
             select(Job, Evaluation)
             .join(Evaluation, Evaluation.job_id == Job.id)
             .where(
+                Evaluation.user_id == owner_id,
                 Evaluation.evaluated_at >= cutoff,
                 Evaluation.fit_score >= immediate_alert_score,
             )

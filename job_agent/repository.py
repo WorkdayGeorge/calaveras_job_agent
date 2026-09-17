@@ -46,10 +46,16 @@ def upsert_job(session: Session, item: NormalizedJob) -> tuple[Job, bool]:
     session.refresh(job)
     return job, True
 
-def evaluation_exists(session: Session, job_id: str, resume_version: str) -> bool:
+def evaluation_exists(
+    session: Session,
+    job_id: str,
+    resume_version: str,
+    user_id: str | None = None,
+) -> bool:
     return session.scalar(
         select(Evaluation.id).where(
             Evaluation.job_id == job_id,
-            Evaluation.resume_version == resume_version
+            Evaluation.resume_version == resume_version,
+            Evaluation.user_id == user_id,
         )
     ) is not None
