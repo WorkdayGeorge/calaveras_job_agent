@@ -9,7 +9,7 @@
   {% endif %}
 
   <label for="sort"><span class="muted">Sort by</span></label>
-  <select id="sort" name="sort" onchange="this.form.submit()">
+  <select id="sort" name="sort">
     <option value="newest_posted" {% if sort_by == "newest_posted" %}selected{% endif %}>Newest posting</option>
     <option value="oldest_posted" {% if sort_by == "oldest_posted" %}selected{% endif %}>Oldest posting</option>
     <option value="newest_found" {% if sort_by == "newest_found" %}selected{% endif %}>Newest found</option>
@@ -18,6 +18,7 @@
     <option value="title" {% if sort_by == "title" %}selected{% endif %}>Job title A-Z</option>
     <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
   </select>
+  <button class="btn secondary" style="margin-top:8px">Apply sort</button>
 </form>
 <table>
 <tr><th>Job</th><th>Posted</th><th>Fit</th><th>Recommendation</th><th>Status</th><th>Apply</th></tr>
@@ -29,11 +30,11 @@
 <td>{% if ev %}{{ ev.recommendation }}<br><small>{{ ev.reasoning }}</small>{% else %}—{% endif %}</td>
 <td>
 <form method="post" action="/jobs/{{ job.id }}/status">
-<select name="status" onchange="this.form.submit()">
+<select name="status">
 {% for s in ["new","reviewed","interested","applied","interview","rejected","hired","ignore","expired"] %}
 <option value="{{ s }}" {% if (state.status if state else job.status) == s %}selected{% endif %}>{{ s }}</option>
 {% endfor %}
-</select></form>
+</select><button class="btn secondary" style="margin-top:8px">Save</button></form>
 </td>
 <td>
   <a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener">Open</a>

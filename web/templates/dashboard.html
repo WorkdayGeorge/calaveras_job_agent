@@ -39,7 +39,7 @@
 
   <form method="get" action="/" class="inline">
     <label for="sort"><span class="muted">Sort by</span></label>
-    <select id="sort" name="sort" onchange="this.form.submit()">
+    <select id="sort" name="sort">
       <option value="newest_posted" {% if sort_by == "newest_posted" %}selected{% endif %}>Newest posting</option>
       <option value="oldest_posted" {% if sort_by == "oldest_posted" %}selected{% endif %}>Oldest posting</option>
       <option value="newest_found" {% if sort_by == "newest_found" %}selected{% endif %}>Newest found</option>
@@ -48,6 +48,7 @@
       <option value="title" {% if sort_by == "title" %}selected{% endif %}>Job title A-Z</option>
       <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
     </select>
+    <button class="btn secondary" style="margin-top:8px">Apply sort</button>
   </form>
 </div>
 <table>

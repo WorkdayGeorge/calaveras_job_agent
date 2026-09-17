@@ -45,11 +45,14 @@
     <a href="/">Dashboard</a>
     <a href="/jobs">Jobs</a>
     {% if request.session.get("role", "administrator") == "administrator" %}
+    <a href="/admin/analytics">Analytics</a>
     <a href="/admin/users">Users</a>
+    <a href="/admin/notifications">Notifications</a>
     <a href="/settings">Settings</a>
     <a href="/resumes">Resumes</a>
     <a href="/sources">Sources</a>
     <a href="/runs">Runs</a>
+    <a href="/admin/audit">Audit Log</a>
     {% endif %}
   </div>
   <div>

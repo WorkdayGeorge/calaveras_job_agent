@@ -22,6 +22,8 @@ A deployable job-search and resume-fit system for Joshua George.
 - GitHub Actions unit tests.
 - Optional database-backed administrator and user accounts.
 - Email one-time codes, forced first-login password changes, and password reset.
+- Administrator analytics, per-user activity drilldowns, notification history,
+  and security audit logs.
 
 The original two-agent engine remains:
 
@@ -103,6 +105,15 @@ profile version, so older scores and application packages are not presented as
 current results. Joshua's existing profile is seeded as `master-profile-v1`,
 including the existing Google coursework, QuickBooks, and accounting-experience
 truth safeguards.
+
+The administrator-only **Analytics** page supports Today, Last 7 Days, Last 30
+Days, This Month, and custom date ranges. It reports notifications, failures,
+applications, interviews, hires, operational failures, per-user activity, and
+source effectiveness. **Notifications** lists the exact openings associated
+with each delivery record, and **Audit Log** records authentication and account
+administration events. Browser POST requests are protected by same-origin
+validation in production, and responses include clickjacking, MIME-sniffing,
+referrer, and content-security headers.
 
 ## Worker only
 

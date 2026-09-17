@@ -7,17 +7,19 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy import select, desc, func, and_
 
 from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
     Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage,
-    User, UserJobState, CandidateProfile, UserPreference,
+    User, UserJobState, CandidateProfile, UserPreference, Notification, AuditEvent,
 )
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
@@ -32,6 +34,7 @@ from job_agent.profile_store import (
     seed_admin_profile,
     validate_candidate_profile,
 )
+from job_agent.analytics import build_admin_analytics, resolve_date_range
 
 
 
@@ -130,6 +133,34 @@ def job_sort_order(sort_by):
     )
 
 app = FastAPI(title="Calaveras Job Agent")
+
+
+class BrowserSecurityMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+            source = request.headers.get("origin") or request.headers.get("referer")
+            if source:
+                source_host = urlsplit(source).netloc.lower()
+                request_host = (
+                    request.headers.get("x-forwarded-host")
+                    or request.headers.get("host", "")
+                ).split(",", 1)[0].strip().lower()
+                if source_host != request_host:
+                    return HTMLResponse("Cross-site request rejected", status_code=403)
+            elif env("APP_ENV", "development") == "production":
+                return HTMLResponse("Request origin required", status_code=403)
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+            "script-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+        )
+        return response
+
+
+app.add_middleware(BrowserSecurityMiddleware)
 app.add_middleware(
     SessionMiddleware,
     secret_key=env("SESSION_SECRET", "dev-only-change-me"),
@@ -241,14 +272,17 @@ def login(request: Request, password: str = Form(...), email: str = Form("")):
 
     configured = env("ADMIN_PASSWORD", "")
     if configured and secrets.compare_digest(password, configured):
+        admin_identity = None
         with SessionLocal() as session:
             admin = bootstrap_admin(session)
             assign_legacy_records_to_admin(session, admin)
+            if admin:
+                admin_identity = (admin.id, admin.email)
         request.session["authenticated"] = True
         request.session["role"] = "administrator"
-        if admin:
-            request.session["user_id"] = admin.id
-            request.session["email"] = admin.email
+        if admin_identity:
+            request.session["user_id"] = admin_identity[0]
+            request.session["email"] = admin_identity[1]
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(
         request,
@@ -920,6 +954,100 @@ def users_page(request: Request):
     with SessionLocal() as session:
         users = session.scalars(select(User).order_by(User.created_at.desc())).all()
     return templates.TemplateResponse(request, "users.html", {"users": users})
+
+
+def analytics_context(period: str, start: str | None, end: str | None):
+    start_utc, end_utc, range_label = resolve_date_range(period, start, end)
+    with SessionLocal() as session:
+        analytics = build_admin_analytics(session, start_utc, end_utc)
+    return {
+        "analytics": analytics,
+        "period": period,
+        "start": start or "",
+        "end": end or "",
+        "range_label": range_label,
+    }
+
+
+@app.get("/admin/analytics", response_class=HTMLResponse)
+def analytics_page(
+    request: Request,
+    period: str = "30d",
+    start: str | None = None,
+    end: str | None = None,
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    return templates.TemplateResponse(
+        request,
+        "analytics.html",
+        analytics_context(period, start, end),
+    )
+
+
+@app.get("/admin/notifications", response_class=HTMLResponse)
+def notifications_page(
+    request: Request,
+    period: str = "30d",
+    start: str | None = None,
+    end: str | None = None,
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    return templates.TemplateResponse(
+        request,
+        "notifications.html",
+        analytics_context(period, start, end),
+    )
+
+
+@app.get("/admin/users/{user_id}/activity", response_class=HTMLResponse)
+def user_activity_page(
+    user_id: str,
+    request: Request,
+    period: str = "30d",
+    start: str | None = None,
+    end: str | None = None,
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    context = analytics_context(period, start, end)
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+    analytics = context["analytics"]
+    context.update({
+        "user": user,
+        "user_notifications": [row for row in analytics["notifications"] if row["notification"].user_id == user_id],
+        "user_applications": [row for row in analytics["applications"] if row["state"].user_id == user_id],
+    })
+    return templates.TemplateResponse(request, "user_activity.html", context)
+
+
+@app.get("/admin/audit", response_class=HTMLResponse)
+def audit_page(request: Request, event_type: str | None = None):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        users = {user.id: user for user in session.scalars(select(User)).all()}
+        stmt = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(500)
+        if event_type:
+            stmt = stmt.where(AuditEvent.event_type == event_type)
+        events = session.scalars(stmt).all()
+        event_types = session.scalars(
+            select(AuditEvent.event_type).distinct().order_by(AuditEvent.event_type)
+        ).all()
+    return templates.TemplateResponse(request, "audit.html", {
+        "events": events,
+        "users": users,
+        "event_types": event_types,
+        "event_type": event_type or "",
+    })
 
 
 @app.post("/admin/users")
