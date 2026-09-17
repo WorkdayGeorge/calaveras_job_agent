@@ -108,9 +108,11 @@ def email_high_priority_digest(
     recipient: str | None = None,
     recent_immediate_items: list[tuple[dict, dict]] | None = None,
     immediate_alert_score: int | None = None,
+    subject_prefix: str = "",
+    allow_empty: bool = False,
 ) -> tuple[bool, str]:
     recent_immediate_items = recent_immediate_items or []
-    if not items and not recent_immediate_items:
+    if not allow_empty and not items and not recent_immediate_items:
         return False, "no digest items"
 
     if str(env("SMTP_ENABLED", "false")).lower() not in {"1", "true", "yes", "on"}:
@@ -180,7 +182,7 @@ def email_high_priority_digest(
 
     msg = EmailMessage()
     msg["Subject"] = (
-        "High-Priority Job Digest — "
+        f"{subject_prefix}High-Priority Job Digest — "
         f"{len(items)} new, {len(recent_immediate_items)} recent"
     )
     msg["From"] = from_addr

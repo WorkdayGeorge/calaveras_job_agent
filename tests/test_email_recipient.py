@@ -129,3 +129,47 @@ def test_digest_includes_last_30_days_threshold_section(monkeypatch):
     assert "met or exceeded 75/100" in sent["body"]
     assert "Accounting Technician" in sent["body"]
     assert "2026-09-16T18:30:00+00:00" in sent["body"]
+
+
+def test_digest_preview_can_send_empty_sections(monkeypatch):
+    sent = {}
+
+    class SMTP:
+        def __init__(self, host, port, timeout):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def starttls(self):
+            pass
+
+        def login(self, username, password):
+            pass
+
+        def send_message(self, message):
+            sent["subject"] = message["Subject"]
+            sent["body"] = message.get_content()
+
+    monkeypatch.setenv("SMTP_ENABLED", "true")
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.com")
+    monkeypatch.setenv("SMTP_USERNAME", "sender@example.com")
+    monkeypatch.setenv("SMTP_PASSWORD", "not-a-real-password")
+    monkeypatch.setattr("job_agent.notify.smtplib.SMTP", SMTP)
+
+    success, _ = email_high_priority_digest(
+        [],
+        recipient="jobs@example.com",
+        recent_immediate_items=[],
+        immediate_alert_score=75,
+        subject_prefix="[TEST] ",
+        allow_empty=True,
+    )
+
+    assert success is True
+    assert sent["subject"] == "[TEST] High-Priority Job Digest — 0 new, 0 recent"
+    assert "No newly queued jobs" in sent["body"]
+    assert "No qualifying jobs in the last 30 days" in sent["body"]
