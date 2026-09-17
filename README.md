@@ -20,6 +20,8 @@ A deployable job-search and resume-fit system for Joshua George.
 - Cloud Run Service + Cloud Run Job architecture.
 - Google Cloud deployment guide.
 - GitHub Actions unit tests.
+- Optional database-backed administrator and user accounts.
+- Email one-time codes, forced first-login password changes, and password reset.
 
 The original two-agent engine remains:
 
@@ -56,6 +58,33 @@ http://127.0.0.1:8000
 ```
 
 The demo provider does not require API credentials.
+
+## Multi-user authentication rollout
+
+The production-safe default remains the original single-administrator login:
+
+```env
+AUTH_MODE=legacy
+```
+
+Database-backed accounts are present but should only be enabled after the
+per-user resume, evaluation, notification, and application-state migration is
+complete. Enabling it early would give users access to shared legacy records.
+
+Before enabling database authentication, configure SMTP and set:
+
+```env
+AUTH_MODE=database
+ADMIN_EMAIL=administrator@example.com
+ADMIN_DISPLAY_NAME=Administrator
+```
+
+On startup, the service creates the first administrator from `ADMIN_EMAIL` and
+the existing `ADMIN_PASSWORD`. The administrator password must contain at least
+12 characters. The administrator can then create user accounts under **Users**.
+Each user receives an administrator-assigned temporary password, verifies a
+six-digit email code at sign-in, and must replace the temporary password before
+using the application.
 
 ## Worker only
 

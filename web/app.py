@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 
@@ -14,11 +14,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from sqlalchemy import select, desc, func
 
 from job_agent.db import init_db, SessionLocal
-from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage
+from job_agent.models import Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage, User
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
 from job_agent.config import load_settings, env
-from job_agent.notify import email_notify, normalize_email_address
+from job_agent.notify import email_notify, email_text, normalize_email_address
 from job_agent.settings_store import (
     seed_settings, get_bool, get_int, get_setting, set_setting
 )
@@ -28,6 +28,20 @@ from job_agent.settings_store import (
 
 from .cloud_trigger import trigger_worker
 from .resume_storage import save_resume
+from .auth import (
+    bootstrap_admin,
+    consume_token,
+    database_auth_enabled,
+    find_user_by_email,
+    hash_password,
+    issue_token,
+    new_numeric_code,
+    normalize_login_email,
+    record_audit,
+    token_digest,
+    utc_aware,
+    verify_password,
+)
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
@@ -96,11 +110,24 @@ app.add_middleware(
 )
 
 def authed(request: Request) -> bool:
-    return bool(request.session.get("authenticated"))
+    return bool(request.session.get("user_id") or request.session.get("authenticated"))
+
+def admin_user(request: Request) -> bool:
+    return authed(request) and request.session.get("role", "administrator") == "administrator"
 
 def require_auth(request: Request):
     if not authed(request):
         return RedirectResponse("/login", status_code=303)
+    if request.session.get("must_change_password") and request.url.path != "/account/change-password":
+        return RedirectResponse("/account/change-password", status_code=303)
+    return None
+
+def require_admin(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    if not admin_user(request):
+        return HTMLResponse("Administrator access required", status_code=403)
     return None
 
 @app.on_event("startup")
@@ -108,6 +135,8 @@ def startup():
     init_db()
     with SessionLocal() as session:
         seed_settings(session, load_settings())
+        if database_auth_enabled():
+            bootstrap_admin(session)
 
 @app.get("/health")
 def health():
@@ -118,21 +147,179 @@ def login_page(request: Request):
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": None}
+        {"error": None, "database_auth": database_auth_enabled()}
     )
 
 @app.post("/login", response_class=HTMLResponse)
-def login(request: Request, password: str = Form(...)):
+def login(request: Request, password: str = Form(...), email: str = Form("")):
+    if database_auth_enabled():
+        now = datetime.now(timezone.utc)
+        with SessionLocal() as session:
+            user = find_user_by_email(session, email)
+            if (
+                not user
+                or user.status != "active"
+                or (user.locked_until and utc_aware(user.locked_until) > now)
+                or not verify_password(password, user.password_hash)
+            ):
+                if user and user.status == "active":
+                    user.failed_login_attempts += 1
+                    if user.failed_login_attempts >= 5:
+                        user.locked_until = now + timedelta(minutes=15)
+                        user.failed_login_attempts = 0
+                    session.commit()
+                return templates.TemplateResponse(
+                    request,
+                    "login.html",
+                    {"error": "Invalid email or password.", "database_auth": True},
+                    status_code=401,
+                )
+
+            code = new_numeric_code()
+            issue_token(session, user, "login_otp", code, minutes=10)
+            sent, _ = email_text(
+                user.email,
+                "Your Calaveras Job Agent sign-in code",
+                f"Your six-digit sign-in code is: {code}\n\nThis code expires in 10 minutes.",
+            )
+            if not sent:
+                record_audit(session, "login_otp_delivery_failed", target_user_id=user.id, request=request)
+                return templates.TemplateResponse(
+                    request,
+                    "login.html",
+                    {"error": "The sign-in code could not be sent. Please contact the administrator.", "database_auth": True},
+                    status_code=503,
+                )
+            request.session.clear()
+            request.session["pending_user_id"] = user.id
+            return RedirectResponse("/login/verify", status_code=303)
+
     configured = env("ADMIN_PASSWORD", "")
     if configured and secrets.compare_digest(password, configured):
         request.session["authenticated"] = True
+        request.session["role"] = "administrator"
         return RedirectResponse("/", status_code=303)
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": "Invalid password."},
+        {"error": "Invalid password.", "database_auth": False},
         status_code=401
     )
+
+@app.get("/login/verify", response_class=HTMLResponse)
+def verify_login_page(request: Request):
+    if not request.session.get("pending_user_id"):
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(request, "verify_login.html", {"error": None})
+
+@app.post("/login/verify", response_class=HTMLResponse)
+def verify_login(request: Request, code: str = Form(...)):
+    pending_user_id = request.session.get("pending_user_id")
+    with SessionLocal() as session:
+        user = session.get(User, pending_user_id) if pending_user_id else None
+        if not user or not consume_token(session, user, "login_otp", code):
+            return templates.TemplateResponse(
+                request, "verify_login.html", {"error": "Invalid or expired code."}, status_code=401
+            )
+        now = datetime.now(timezone.utc)
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        user.last_login_at = now
+        user.updated_at = now
+        session.commit()
+        record_audit(session, "login_succeeded", actor_user_id=user.id, request=request)
+        request.session.clear()
+        request.session.update({
+            "user_id": user.id,
+            "role": user.role,
+            "email": user.email,
+            "must_change_password": user.must_change_password,
+        })
+        destination = "/account/change-password" if user.must_change_password else "/"
+        return RedirectResponse(destination, status_code=303)
+
+@app.get("/account/change-password", response_class=HTMLResponse)
+def change_password_page(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    return templates.TemplateResponse(request, "change_password.html", {"error": None})
+
+@app.post("/account/change-password", response_class=HTMLResponse)
+def change_password(request: Request, current_password: str = Form(...), new_password: str = Form(...), confirm_password: str = Form(...)):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    if not database_auth_enabled():
+        return RedirectResponse("/", status_code=303)
+    with SessionLocal() as session:
+        user = session.get(User, request.session.get("user_id"))
+        error = None
+        if not user or not verify_password(current_password, user.password_hash):
+            error = "Current password is incorrect."
+        elif new_password != confirm_password:
+            error = "New passwords do not match."
+        else:
+            try:
+                user.password_hash = hash_password(new_password)
+            except ValueError as exc:
+                error = str(exc)
+        if error:
+            return templates.TemplateResponse(request, "change_password.html", {"error": error}, status_code=400)
+        user.must_change_password = False
+        user.updated_at = datetime.now(timezone.utc)
+        session.commit()
+        record_audit(session, "password_changed", actor_user_id=user.id, target_user_id=user.id, request=request)
+        request.session["must_change_password"] = False
+    return RedirectResponse("/", status_code=303)
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    return templates.TemplateResponse(request, "forgot_password.html", {"message": None})
+
+@app.post("/forgot-password", response_class=HTMLResponse)
+def forgot_password(request: Request, email: str = Form(...)):
+    generic = "If an active account exists, a reset link has been sent."
+    if database_auth_enabled():
+        with SessionLocal() as session:
+            user = find_user_by_email(session, email)
+            if user and user.status == "active":
+                raw_token = secrets.token_urlsafe(32)
+                issue_token(session, user, "password_reset", raw_token, minutes=30)
+                reset_url = str(request.url_for("reset_password_page")) + f"?token={raw_token}"
+                email_text(user.email, "Reset your Calaveras Job Agent password", f"Use this link within 30 minutes to reset your password:\n\n{reset_url}")
+                record_audit(session, "password_reset_requested", target_user_id=user.id, request=request)
+    return templates.TemplateResponse(request, "forgot_password.html", {"message": generic})
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(request: Request, token: str = ""):
+    return templates.TemplateResponse(request, "reset_password.html", {"token": token, "error": None})
+
+@app.post("/reset-password", response_class=HTMLResponse)
+def reset_password(request: Request, token: str = Form(...), new_password: str = Form(...), confirm_password: str = Form(...)):
+    error = None
+    if new_password != confirm_password:
+        error = "New passwords do not match."
+    with SessionLocal() as session:
+        from job_agent.models import AuthToken
+        token_row = session.scalar(select(AuthToken).where(AuthToken.token_hash == token_digest(token), AuthToken.purpose == "password_reset", AuthToken.used_at.is_(None)))
+        user = session.get(User, token_row.user_id) if token_row else None
+        if not error and (not user or not consume_token(session, user, "password_reset", token)):
+            error = "This reset link is invalid or expired."
+        if not error:
+            try:
+                user.password_hash = hash_password(new_password)
+            except ValueError as exc:
+                error = str(exc)
+        if error:
+            return templates.TemplateResponse(request, "reset_password.html", {"token": token, "error": error}, status_code=400)
+        user.must_change_password = False
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        user.updated_at = datetime.now(timezone.utc)
+        session.commit()
+        record_audit(session, "password_reset_completed", target_user_id=user.id, request=request)
+    return RedirectResponse("/login?message=Password+reset", status_code=303)
 
 @app.post("/logout")
 def logout(request: Request):
@@ -174,7 +361,7 @@ def dashboard(request: Request, sort: str = "newest_posted"):
 
 @app.post("/admin/toggle")
 def toggle_agent(request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -184,7 +371,7 @@ def toggle_agent(request: Request):
 
 @app.post("/admin/run-now")
 def run_now(request: Request, background_tasks: BackgroundTasks):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     background_tasks.add_task(trigger_worker)
@@ -192,7 +379,7 @@ def run_now(request: Request, background_tasks: BackgroundTasks):
 
 @app.post("/admin/test-email")
 def test_email(request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
 
@@ -241,7 +428,7 @@ def test_email(request: Request):
 
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -301,7 +488,7 @@ def save_settings(
     allow_unverified_current_jobs_in_digest: str | None = Form(None),
     alert_email_to: str = Form(""),
 ):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     recipient_input = alert_email_to.strip()
@@ -397,7 +584,7 @@ def save_settings(
 
 @app.post("/settings/search-terms/add")
 def add_term(request: Request, term: str = Form(...)):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     term = " ".join(term.split()).strip()
@@ -413,7 +600,7 @@ def add_term(request: Request, term: str = Form(...)):
 
 @app.post("/settings/search-terms/{term_id}/toggle")
 def toggle_term(term_id: str, request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -425,7 +612,7 @@ def toggle_term(term_id: str, request: Request):
 
 @app.post("/settings/search-terms/{term_id}/delete")
 def delete_term(term_id: str, request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -556,9 +743,88 @@ def build_application_package(job_id: str, request: Request):
     )
 
 
+@app.get("/admin/users", response_class=HTMLResponse)
+def users_page(request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        users = session.scalars(select(User).order_by(User.created_at.desc())).all()
+    return templates.TemplateResponse(request, "users.html", {"users": users})
+
+
+@app.post("/admin/users")
+def create_user(
+    request: Request,
+    email: str = Form(...),
+    display_name: str = Form(...),
+    temporary_password: str = Form(...),
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    normalized_email = normalize_login_email(email)
+    if not normalized_email:
+        return RedirectResponse("/admin/users?message=Enter+a+valid+email", status_code=303)
+    try:
+        password_hash = hash_password(temporary_password)
+    except ValueError:
+        return RedirectResponse("/admin/users?message=Temporary+password+must+be+at+least+12+characters", status_code=303)
+    with SessionLocal() as session:
+        if find_user_by_email(session, normalized_email):
+            return RedirectResponse("/admin/users?message=That+email+already+exists", status_code=303)
+        now = datetime.now(timezone.utc)
+        user = User(
+            email=normalized_email,
+            display_name=display_name.strip() or normalized_email,
+            password_hash=password_hash,
+            role="user",
+            status="active",
+            must_change_password=True,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(user)
+        session.commit()
+        record_audit(
+            session,
+            "user_created",
+            actor_user_id=request.session.get("user_id"),
+            target_user_id=user.id,
+            request=request,
+        )
+    return RedirectResponse("/admin/users?message=User+created", status_code=303)
+
+
+@app.post("/admin/users/{user_id}/status")
+def change_user_status(user_id: str, request: Request, status: str = Form(...)):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    if status not in {"active", "suspended", "archived"}:
+        return JSONResponse({"error": "invalid status"}, status_code=400)
+    if user_id == request.session.get("user_id") and status != "active":
+        return RedirectResponse("/admin/users?message=You+cannot+suspend+your+own+account", status_code=303)
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if user:
+            user.status = status
+            user.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            record_audit(
+                session,
+                "user_status_changed",
+                actor_user_id=request.session.get("user_id"),
+                target_user_id=user.id,
+                request=request,
+                detail={"status": status},
+            )
+    return RedirectResponse("/admin/users", status_code=303)
+
+
 @app.get("/sources", response_class=HTMLResponse)
 def sources_page(request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
 
@@ -572,7 +838,7 @@ def sources_page(request: Request):
 
 @app.get("/runs", response_class=HTMLResponse)
 def runs_page(request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -585,7 +851,7 @@ def runs_page(request: Request):
 
 @app.get("/resumes", response_class=HTMLResponse)
 def resumes_page(request: Request):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -604,7 +870,7 @@ async def upload_resume(
     resume_type: str = Form(...),
     resume: UploadFile = File(...),
 ):
-    denial = require_auth(request)
+    denial = require_admin(request)
     if denial:
         return denial
     if resume_type not in {"focused", "all-work-experience"}:

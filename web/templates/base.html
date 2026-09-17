@@ -44,12 +44,19 @@
     <strong>Calaveras Job Agent</strong>
     <a href="/">Dashboard</a>
     <a href="/jobs">Jobs</a>
+    {% if request.session.get("role", "administrator") == "administrator" %}
+    <a href="/admin/users">Users</a>
     <a href="/settings">Settings</a>
     <a href="/resumes">Resumes</a>
     <a href="/sources">Sources</a>
     <a href="/runs">Runs</a>
+    {% endif %}
   </div>
-  <form method="post" action="/logout"><button class="btn secondary">Sign out</button></form>
+  <div>
+    {% if request.session.get("email") %}<span style="margin-right:12px">{{ request.session.get("email") }}</span>{% endif %}
+    {% if request.session.get("user_id") %}<a href="/account/change-password">Change password</a>{% endif %}
+    <form class="inline" method="post" action="/logout"><button class="btn secondary">Sign out</button></form>
+  </div>
 </header>
 <main>{% block content %}{% endblock %}</main>
 </body>

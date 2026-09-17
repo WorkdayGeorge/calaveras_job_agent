@@ -103,6 +103,35 @@ def email_notify(
     except Exception as exc:
         return False, str(exc)
 
+
+def email_text(recipient: str, subject: str, body: str) -> tuple[bool, str]:
+    """Send a plain-text account or operational email through configured SMTP."""
+    if str(env("SMTP_ENABLED", "false")).lower() not in {"1", "true", "yes", "on"}:
+        return False, "SMTP disabled"
+
+    host = env("SMTP_HOST")
+    port = int(env("SMTP_PORT", "587"))
+    username = env("SMTP_USERNAME")
+    password = env("SMTP_PASSWORD")
+    to_addr = normalize_email_address(recipient)
+    from_addr = env("ALERT_EMAIL_FROM") or username
+    if not all([host, username, password, to_addr, from_addr]):
+        return False, "SMTP settings incomplete or recipient invalid"
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP(host, port, timeout=30) as smtp:
+            smtp.starttls()
+            smtp.login(username, password)
+            smtp.send_message(msg)
+        return True, "sent"
+    except Exception as exc:
+        return False, str(exc)
+
 def email_high_priority_digest(
     items: list[tuple[dict, dict]],
     recipient: str | None = None,
