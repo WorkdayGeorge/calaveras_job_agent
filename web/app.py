@@ -36,6 +36,7 @@ from job_agent.profile_store import (
 )
 from job_agent.analytics import build_admin_analytics, resolve_date_range
 from job_agent.preflight import production_readiness
+from job_agent.backfill import backfill_progress, request_backfill
 
 
 
@@ -553,6 +554,8 @@ def settings_page(request: Request):
             "fresh_job_window_minutes": get_int(session, "fresh_job_window_minutes", 60),
             "minimum_fit_score": get_int(session, "minimum_fit_score", 60),
             "immediate_alert_score": get_int(session, "immediate_alert_score", 75),
+            "evaluation_batch_size": get_int(session, "evaluation_batch_size", 12),
+            "backfill_batch_size": get_int(session, "backfill_batch_size", 6),
             "allow_unverified_current_jobs_in_digest": get_bool(
                  session, "allow_unverified_current_jobs_in_digest", True
             ),
@@ -596,6 +599,8 @@ def save_settings(
     fresh_job_window_minutes: int = Form(...),
     minimum_fit_score: int = Form(...),
     immediate_alert_score: int = Form(...),
+    evaluation_batch_size: int = Form(12),
+    backfill_batch_size: int = Form(6),
     schedule_interval_minutes: int = Form(...),
     schedule_start_time: str = Form(...),
     schedule_stop_time: str = Form(...),
@@ -634,6 +639,13 @@ def save_settings(
             session,
             "immediate_alert_score",
             str(max(0, min(100, immediate_alert_score))),
+        )
+        batch_size = max(1, min(50, evaluation_batch_size))
+        set_setting(session, "evaluation_batch_size", str(batch_size))
+        set_setting(
+            session,
+            "backfill_batch_size",
+            str(max(0, min(batch_size, backfill_batch_size))),
         )
 
         allowed_intervals = {5, 10, 15, 30, 60}
@@ -1141,11 +1153,13 @@ def user_profile_page(user_id: str, request: Request):
             return HTMLResponse("User not found", status_code=404)
         profile, preference = ensure_user_profile_records(session, user)
         profile_json = json.dumps(profile.profile_data, indent=2, ensure_ascii=False)
+        progress = backfill_progress(session, user.id, profile.resume_version)
     return templates.TemplateResponse(request, "user_profile.html", {
         "user": user,
         "profile": profile,
         "preference": preference,
         "profile_json": profile_json,
+        "backfill": progress,
         "error": None,
     })
 
@@ -1185,11 +1199,13 @@ def save_user_profile(
             return HTMLResponse("User not found", status_code=404)
         profile, preference = ensure_user_profile_records(session, user)
         if errors:
+            progress = backfill_progress(session, user.id, profile.resume_version)
             return templates.TemplateResponse(request, "user_profile.html", {
                 "user": user,
                 "profile": profile,
                 "preference": preference,
                 "profile_json": profile_json,
+                "backfill": progress,
                 "error": " ".join(errors),
             }, status_code=400)
 
@@ -1215,6 +1231,40 @@ def save_user_profile(
         )
     return RedirectResponse(
         f"/admin/users/{user_id}/profile?message=Profile+saved",
+        status_code=303,
+    )
+
+
+@app.post("/admin/users/{user_id}/backfill")
+def queue_user_backfill(user_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        profile = session.get(CandidateProfile, user_id)
+        if not user or not profile:
+            return HTMLResponse("User not found", status_code=404)
+        if not profile.is_active:
+            return RedirectResponse(
+                f"/admin/users/{user_id}/profile?message=Activate+the+profile+before+requesting+a+backfill",
+                status_code=303,
+            )
+        backfill = request_backfill(session, user_id)
+        record_audit(
+            session,
+            "evaluation_backfill_requested",
+            actor_user_id=current_user_id(request),
+            target_user_id=user_id,
+            request=request,
+            detail={
+                "resume_version": profile.resume_version,
+                "pending": max(0, backfill.total_jobs - backfill.completed_jobs),
+                "notifications": False,
+            },
+        )
+    return RedirectResponse(
+        f"/admin/users/{user_id}/profile?message=Score+backfill+queued",
         status_code=303,
     )
 

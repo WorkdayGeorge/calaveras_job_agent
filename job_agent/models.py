@@ -244,6 +244,24 @@ class CandidateProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class EvaluationBackfill(Base):
+    __tablename__ = "evaluation_backfills"
+    __table_args__ = (
+        UniqueConstraint("user_id", "resume_version", name="uq_user_backfill_version"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    resume_version: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="queued")
+    total_jobs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completed_jobs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    failed_jobs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class UserPreference(Base):
     __tablename__ = "user_preferences"
 

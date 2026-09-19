@@ -129,6 +129,14 @@ MFA code or password-reset link invalidates the user's earlier unused one. The
 web service also refuses to start in production database mode when this check
 fails, while legacy mode remains unaffected.
 
+Multi-user evaluation work is bounded by **Evaluations per run** so a growing
+user list cannot create an unbounded Cloud Run execution. Work not reached in
+one execution remains unscored and resumes safely when the job is encountered
+again. Administrators can queue an existing-job score backfill from a user's
+**Profile & alerts** page; progress is shown there, processing occurs in small
+batches, and historical backfills never send job-alert emails. The global
+Settings email is retained only as a legacy/default and dashboard-test address.
+
 ## Worker only
 
 ```bash

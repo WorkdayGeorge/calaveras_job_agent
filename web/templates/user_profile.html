@@ -6,4 +6,13 @@
 <div class="card"><h2 style="margin-top:0">Evaluation profile</h2><p class="muted">Review every claim before activation. Uploaded resumes never rewrite this profile automatically.</p><label><input style="width:auto" type="checkbox" name="is_active" {% if profile.is_active %}checked{% endif %}> Active for job evaluation</label><p class="muted">Version {{ profile.version }} — {{ profile.resume_version }}</p><label>Candidate profile JSON</label><textarea name="profile_json" rows="34" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace">{{ profile_json }}</textarea></div>
 <div class="card" style="margin-top:18px"><h2 style="margin-top:0">Notifications</h2><label>Recipient email</label><input name="notification_email" type="email" value="{{ preference.notification_email }}" required><div class="row"><div><label>Daily digest time (Pacific)</label><input name="digest_time" type="time" value="{{ preference.digest_time }}" required></div><div><label><input style="width:auto" type="checkbox" name="immediate_alerts" {% if preference.immediate_alerts %}checked{% endif %}> Immediate alerts</label></div><div><label><input style="width:auto" type="checkbox" name="daily_digest" {% if preference.daily_digest %}checked{% endif %}> Daily digest</label></div></div></div>
 <button class="btn" style="margin-top:18px">Save profile and notifications</button>
-</form>{% endblock %}
+</form>
+<div class="card" style="margin-top:18px">
+  <h2 style="margin-top:0">Existing-job score backfill</h2>
+  <p><strong>{{ backfill.completed }}</strong> of <strong>{{ backfill.total }}</strong> local jobs scored for {{ profile.resume_version }}. <strong>{{ backfill.pending }}</strong> pending.</p>
+  {% if backfill.request %}<p class="muted">Status: {{ backfill.request.status }}{% if backfill.request.failed_jobs %} — {{ backfill.request.failed_jobs }} failed attempts{% endif %}</p>{% endif %}
+  <p class="muted">Backfills run in small resumable batches and never send historical job notifications.</p>
+  <form method="post" action="/admin/users/{{ user.id }}/backfill"><button class="btn secondary" {% if not profile.is_active or backfill.pending == 0 %}disabled{% endif %}>Queue score backfill</button></form>
+  {% if not profile.is_active %}<p class="muted">Activate and save the profile before requesting a backfill.</p>{% endif %}
+</div>
+{% endblock %}

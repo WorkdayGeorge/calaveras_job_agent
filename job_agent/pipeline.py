@@ -8,6 +8,7 @@ from .config import load_settings, env
 from .db import init_db, SessionLocal
 from .evaluator import load_candidate_profile, evaluate_job
 from .models import Job, Evaluation, Notification, RunLog, User
+from .backfill import pending_backfill_jobs, queued_backfills, refresh_backfill
 from .normalize import normalize_job
 from .notify import notification_bucket, console_notify, email_notify, email_high_priority_digest
 from .providers.demo import DemoProvider
@@ -295,6 +296,73 @@ def process_high_priority_digest(session) -> dict:
 
     return {"status": "processed", "results": results}
 
+
+def evaluate_for_target(session, job, target, settings, send_notifications=True):
+    """Evaluate and persist one user/job pair, optionally routing alerts."""
+    job_dict = job_to_dict(job)
+    result = evaluate_job(job_dict, target["profile"])
+    evaluation = Evaluation(
+        user_id=target["user_id"],
+        job_id=job.id,
+        resume_version=target["resume_version"],
+        fit_score=int(result["fit_score"]),
+        classification=result["classification"],
+        recommendation=result["recommendation"],
+        selected_resume=result["selected_resume"],
+        matching_skills=result.get("matching_skills", []),
+        transferable_skills=result.get("transferable_skills", []),
+        missing_requirements=result.get("missing_requirements", []),
+        uncertain_requirements=result.get("uncertain_requirements", []),
+        reasoning=result["reasoning"],
+        score_breakdown=result.get("score_breakdown", {}),
+        evaluated_at=datetime.now(timezone.utc),
+    )
+    session.add(evaluation)
+    try:
+        session.commit()
+        session.refresh(evaluation)
+    except IntegrityError:
+        session.rollback()
+        return False, 0
+
+    if not send_notifications:
+        return True, 0
+
+    target_settings = dict(settings)
+    target_settings["alert_email_to"] = target["recipient"]
+    bucket = notification_bucket(job_dict, result, target_settings)
+    if bucket == "high_priority_digest" and target["daily_digest"]:
+        session.add(Notification(
+            user_id=target["user_id"], job_id=job.id,
+            evaluation_id=evaluation.id, channel="digest",
+            sent_at=datetime.now(timezone.utc), status="pending_digest",
+            detail="Queued for daily high-priority digest",
+        ))
+        session.commit()
+    elif bucket != "silent" and target["immediate_alerts"]:
+        console_notify(job_dict, result, bucket)
+        sent, detail = email_notify(
+            job_dict, result, bucket, recipient=target["recipient"]
+        )
+        session.add(Notification(
+            user_id=target["user_id"], job_id=job.id,
+            evaluation_id=evaluation.id,
+            channel="email" if sent else "console",
+            sent_at=datetime.now(timezone.utc),
+            status="sent" if sent else "not_sent", detail=detail,
+        ))
+        session.commit()
+        return True, 1
+    elif bucket != "silent" and target["daily_digest"]:
+        session.add(Notification(
+            user_id=target["user_id"], job_id=job.id,
+            evaluation_id=evaluation.id, channel="digest",
+            sent_at=datetime.now(timezone.utc), status="pending_digest",
+            detail="Queued because immediate alerts are disabled",
+        ))
+        session.commit()
+    return True, 0
+
 def run_once(force: bool = False) -> dict:
     yaml_settings = load_settings()
     init_db()
@@ -324,6 +392,14 @@ def run_once(force: bool = False) -> dict:
                 return summary
 
         settings = _runtime_settings(session, yaml_settings)
+        evaluation_limit = max(1, get_int(session, "evaluation_batch_size", 12))
+        backfill_limit = max(
+            0,
+            min(
+                evaluation_limit,
+                get_int(session, "backfill_batch_size", 6),
+            ),
+        )
         terms = enabled_terms(session)
         providers = get_providers()
         provider_names = ",".join(type(p).__name__.replace("Provider", "").lower() for p in providers)
@@ -337,11 +413,48 @@ def run_once(force: bool = False) -> dict:
         session.commit()
         session.refresh(run)
 
-        found = inserted = evaluated = alerts = 0
+        found = inserted = evaluated = alerts = deferred = attempted = 0
         now = datetime.now(timezone.utc)
         processed_job_ids = set()
         provider_errors = []
         try:
+            target_map = {
+                (target["user_id"], target["resume_version"]): target
+                for target in targets
+            }
+            backfilled = 0
+            for request in queued_backfills(session):
+                if backfilled >= backfill_limit or attempted >= evaluation_limit:
+                    break
+                target = target_map.get((request.user_id, request.resume_version))
+                if not target:
+                    continue
+                request.status = "running"
+                session.commit()
+                remaining = min(
+                    backfill_limit - backfilled,
+                    evaluation_limit - attempted,
+                )
+                for job in pending_backfill_jobs(session, request, remaining):
+                    attempted += 1
+                    try:
+                        created, _ = evaluate_for_target(
+                            session, job, target, settings,
+                            send_notifications=False,
+                        )
+                    except Exception as exc:
+                        request.failed_jobs += 1
+                        session.commit()
+                        provider_errors.append(
+                            f"Backfill evaluation failed for job {job.id} "
+                            f"and user {request.user_id}: {exc}"
+                        )
+                        continue
+                    if created:
+                        evaluated += 1
+                        backfilled += 1
+                refresh_backfill(session, request)
+
             for provider in providers:
                 provider_name = type(provider).__name__.replace("Provider", "")
                 for role in terms:
@@ -396,8 +509,16 @@ def run_once(force: bool = False) -> dict:
                             ):
                                 continue
 
+                            if attempted >= evaluation_limit:
+                                deferred += 1
+                                continue
+
+                            attempted += 1
                             try:
-                                result = evaluate_job(job_dict, target["profile"])
+                                created, alert_count = evaluate_for_target(
+                                    session, job, target, settings,
+                                    send_notifications=True,
+                                )
                             except Exception as exc:
                                 message = (
                                     "Evaluation failed for job "
@@ -406,80 +527,9 @@ def run_once(force: bool = False) -> dict:
                                 provider_errors.append(message)
                                 print(message)
                                 continue
-                            evaluation = Evaluation(
-                                user_id=owner_id,
-                                job_id=job.id,
-                                resume_version=resume_version,
-                                fit_score=int(result["fit_score"]),
-                                classification=result["classification"],
-                                recommendation=result["recommendation"],
-                                selected_resume=result["selected_resume"],
-                                matching_skills=result.get("matching_skills", []),
-                                transferable_skills=result.get("transferable_skills", []),
-                                missing_requirements=result.get("missing_requirements", []),
-                                uncertain_requirements=result.get("uncertain_requirements", []),
-                                reasoning=result["reasoning"],
-                                score_breakdown=result.get("score_breakdown", {}),
-                                evaluated_at=datetime.now(timezone.utc),
-                            )
-                            session.add(evaluation)
-
-                            try:
-                                session.commit()
-                                session.refresh(evaluation)
-                            except IntegrityError:
-                                session.rollback()
-                                continue
-
-                            evaluated += 1
-                            target_settings = dict(settings)
-                            target_settings["alert_email_to"] = target["recipient"]
-                            bucket = notification_bucket(job_dict, result, target_settings)
-                            if (
-                                bucket == "high_priority_digest"
-                                and target["daily_digest"]
-                            ):
-                                session.add(Notification(
-                                    user_id=owner_id,
-                                    job_id=job.id,
-                                    evaluation_id=evaluation.id,
-                                    channel="digest",
-                                    sent_at=datetime.now(timezone.utc),
-                                    status="pending_digest",
-                                    detail="Queued for daily high-priority digest",
-                                ))
-                                session.commit()
-                            elif bucket != "silent":
-                                if target["immediate_alerts"]:
-                                    alerts += 1
-                                    console_notify(job_dict, result, bucket)
-                                    sent, detail = email_notify(
-                                        job_dict,
-                                        result,
-                                        bucket,
-                                        recipient=target["recipient"],
-                                    )
-                                    session.add(Notification(
-                                        user_id=owner_id,
-                                        job_id=job.id,
-                                        evaluation_id=evaluation.id,
-                                        channel="email" if sent else "console",
-                                        sent_at=datetime.now(timezone.utc),
-                                        status="sent" if sent else "not_sent",
-                                        detail=detail,
-                                    ))
-                                    session.commit()
-                                elif target["daily_digest"]:
-                                    session.add(Notification(
-                                        user_id=owner_id,
-                                        job_id=job.id,
-                                        evaluation_id=evaluation.id,
-                                        channel="digest",
-                                        sent_at=datetime.now(timezone.utc),
-                                        status="pending_digest",
-                                        detail="Queued because immediate alerts are disabled",
-                                    ))
-                                    session.commit()
+                            if created:
+                                evaluated += 1
+                                alerts += alert_count
 
             run.finished_at = datetime.now(timezone.utc)
             run.status = "partial" if provider_errors else "success"
@@ -498,7 +548,10 @@ def run_once(force: bool = False) -> dict:
                 "found": found,
                 "new_local_jobs": inserted,
                 "evaluated": evaluated,
+                "evaluation_attempts": attempted,
                 "alerts": alerts,
+                "deferred_evaluations": deferred,
+                "backfilled": backfilled,
                 "provider_errors": provider_errors,
             }
             print("\nRun summary:", summary)

@@ -17,6 +17,8 @@ DEFAULTS = {
     "schedule_stop_time": "17:00",
     "high_priority_digest_time": "17:05",
     "schedule_days": "0,1,2,3,4",
+    "evaluation_batch_size": "12",
+    "backfill_batch_size": "6",
 
 
 
