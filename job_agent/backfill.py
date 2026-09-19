@@ -78,12 +78,16 @@ def pending_backfill_jobs(session, request: EvaluationBackfill, limit: int):
             Evaluation.resume_version == request.resume_version,
         )
     )
+    matched_job_ids = select(UserJobMatch.job_id).where(
+        UserJobMatch.user_id == request.user_id
+    )
     return session.scalars(
         select(Job)
-        .join(UserJobMatch, UserJobMatch.job_id == Job.id)
-        .where(Job.is_local.is_(True), ~already_scored)
-        .where(UserJobMatch.user_id == request.user_id)
-        .distinct()
+        .where(
+            Job.is_local.is_(True),
+            Job.id.in_(matched_job_ids),
+            ~already_scored,
+        )
         .order_by(Job.posted_at.desc().nullslast(), Job.first_seen_at.desc())
         .limit(limit)
     ).all()

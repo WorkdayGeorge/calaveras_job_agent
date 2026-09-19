@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 from sqlalchemy import create_engine, func, select
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import sessionmaker
 
 from job_agent.backfill import (
@@ -120,3 +122,23 @@ def test_historical_backfill_never_creates_notifications(monkeypatch):
     assert created is True
     assert alerts == 0
     assert session.scalar(select(func.count(Notification.id))) == 0
+
+
+def test_pending_query_is_postgresql_safe_with_json_job_columns():
+    class Results:
+        def all(self):
+            return []
+
+    class CapturingSession:
+        statement = None
+
+        def scalars(self, statement):
+            self.statement = statement
+            return Results()
+
+    session = CapturingSession()
+    request = SimpleNamespace(user_id="user-1", resume_version="profile-v1")
+    assert pending_backfill_jobs(session, request, limit=6) == []
+    sql = str(session.statement.compile(dialect=postgresql.dialect()))
+    assert "SELECT DISTINCT" not in sql.upper()
+    assert "user_job_matches" in sql
