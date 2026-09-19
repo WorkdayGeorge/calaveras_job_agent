@@ -262,6 +262,35 @@ class EvaluationBackfill(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class UserSearchTerm(Base):
+    __tablename__ = "user_search_terms"
+    __table_args__ = (
+        UniqueConstraint("user_id", "term", name="uq_user_search_term"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    term: Mapped[str] = mapped_column(String(255), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UserJobMatch(Base):
+    __tablename__ = "user_job_matches"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "job_id", "search_term", name="uq_user_job_match_term"
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), nullable=False)
+    search_term: Mapped[str] = mapped_column(String(255), nullable=False)
+    first_matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 class UserPreference(Base):
     __tablename__ = "user_preferences"
 

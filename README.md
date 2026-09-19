@@ -137,6 +137,14 @@ again. Administrators can queue an existing-job score backfill from a user's
 batches, and historical backfills never send job-alert emails. The global
 Settings email is retained only as a legacy/default and dashboard-test address.
 
+Search terms are user-specific and administrator-managed. Global terms on the
+Settings page are defaults copied to new accounts. The worker combines active
+users' enabled terms, searches each unique phrase once, and associates each
+result only with the users subscribed to that phrase. Jobs remain globally
+deduplicated, while Dashboard, Jobs, applications, evaluations, and alerts are
+restricted to each user's assigned openings. The first rollout creates legacy
+assignments so existing users do not lose access to their current job history.
+
 ## Worker only
 
 ```bash

@@ -4,12 +4,14 @@ from datetime import datetime, timezone
 
 from sqlalchemy import exists, func, select
 
-from .models import CandidateProfile, Evaluation, EvaluationBackfill, Job
+from .models import CandidateProfile, Evaluation, EvaluationBackfill, Job, UserJobMatch
 
 
 def backfill_progress(session, user_id: str, resume_version: str) -> dict:
     total = session.scalar(
-        select(func.count(Job.id)).where(Job.is_local.is_(True))
+        select(func.count(func.distinct(UserJobMatch.job_id))).where(
+            UserJobMatch.user_id == user_id
+        )
     ) or 0
     completed = session.scalar(
         select(func.count(Evaluation.id))
@@ -78,7 +80,10 @@ def pending_backfill_jobs(session, request: EvaluationBackfill, limit: int):
     )
     return session.scalars(
         select(Job)
+        .join(UserJobMatch, UserJobMatch.job_id == Job.id)
         .where(Job.is_local.is_(True), ~already_scored)
+        .where(UserJobMatch.user_id == request.user_id)
+        .distinct()
         .order_by(Job.posted_at.desc().nullslast(), Job.first_seen_at.desc())
         .limit(limit)
     ).all()

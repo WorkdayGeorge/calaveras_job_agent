@@ -9,6 +9,7 @@ from .db import init_db, SessionLocal
 from .evaluator import load_candidate_profile, evaluate_job
 from .models import Job, Evaluation, Notification, RunLog, User
 from .backfill import pending_backfill_jobs, queued_backfills, refresh_backfill
+from .user_search import enabled_user_terms, record_user_job_match
 from .normalize import normalize_job
 from .notify import notification_bucket, console_notify, email_notify, email_high_priority_digest
 from .providers.demo import DemoProvider
@@ -52,6 +53,7 @@ def evaluation_targets(session) -> list[dict]:
             "daily_digest": preference.daily_digest,
             "digest_time": preference.digest_time,
             "preference": preference,
+            "search_terms": enabled_user_terms(session, user.id),
         })
     if targets:
         return targets
@@ -67,7 +69,18 @@ def evaluation_targets(session) -> list[dict]:
         "daily_digest": True,
         "digest_time": get_setting(session, "high_priority_digest_time", "17:05") or "17:05",
         "preference": None,
+        "search_terms": enabled_terms(session),
     }]
+
+
+def targets_for_search_term(targets: list[dict], term: str) -> list[dict]:
+    wanted = term.casefold()
+    return [
+        target for target in targets
+        if wanted in {
+            value.casefold() for value in target.get("search_terms", [])
+        }
+    ]
 
 def get_providers():
     raw = env("JOB_PROVIDERS") or env("JOB_PROVIDER", "demo") or "demo"
@@ -400,7 +413,11 @@ def run_once(force: bool = False) -> dict:
                 get_int(session, "backfill_batch_size", 6),
             ),
         )
-        terms = enabled_terms(session)
+        terms = sorted({
+            term
+            for target in targets
+            for term in target.get("search_terms", [])
+        })
         providers = get_providers()
         provider_names = ",".join(type(p).__name__.replace("Provider", "").lower() for p in providers)
 
@@ -458,6 +475,7 @@ def run_once(force: bool = False) -> dict:
             for provider in providers:
                 provider_name = type(provider).__name__.replace("Provider", "")
                 for role in terms:
+                    role_targets = targets_for_search_term(targets, role)
                     if isinstance(provider, AdzunaProvider):
                         search_locations = (
                             settings["location"].get("search_locations")
@@ -497,9 +515,13 @@ def run_once(force: bool = False) -> dict:
                             inserted += 1
     
                         job_dict = job_to_dict(job)
-                        for target in targets:
+                        for target in role_targets:
                             owner_id = target["user_id"]
                             resume_version = target["resume_version"]
+                            if owner_id:
+                                record_user_job_match(
+                                    session, owner_id, job.id, role
+                                )
                             process_key = (job.id, owner_id, resume_version)
                             if process_key in processed_job_ids:
                                 continue

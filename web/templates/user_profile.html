@@ -8,6 +8,12 @@
 <button class="btn" style="margin-top:18px">Save profile and notifications</button>
 </form>
 <div class="card" style="margin-top:18px">
+  <h2 style="margin-top:0">Search terms</h2>
+  <p class="muted">Only administrators can manage these terms. Providers search each unique term once and assign matching openings to this user.</p>
+  <form method="post" action="/admin/users/{{ user.id }}/search-terms" class="row"><div><label>New search phrase</label><input name="term" placeholder="Accounting Clerk" required></div><div style="flex:0 0 auto"><button class="btn">Add term</button></div></form>
+  <table style="margin-top:14px"><tr><th>Search term</th><th>Enabled</th><th>Actions</th></tr>{% for term in user_terms %}<tr><td>{{ term.term }}</td><td>{{ 'Yes' if term.enabled else 'No' }}</td><td><form class="inline" method="post" action="/admin/users/{{ user.id }}/search-terms/{{ term.id }}/toggle"><button class="btn secondary">{{ 'Disable' if term.enabled else 'Enable' }}</button></form><form class="inline" method="post" action="/admin/users/{{ user.id }}/search-terms/{{ term.id }}/delete"><button class="btn danger">Delete</button></form></td></tr>{% else %}<tr><td colspan="3">No search terms configured.</td></tr>{% endfor %}</table>
+</div>
+<div class="card" style="margin-top:18px">
   <h2 style="margin-top:0">Existing-job score backfill</h2>
   <p><strong>{{ backfill.completed }}</strong> of <strong>{{ backfill.total }}</strong> local jobs scored for {{ profile.resume_version }}. <strong>{{ backfill.pending }}</strong> pending.</p>
   {% if backfill.request %}<p class="muted">Status: {{ backfill.request.status }}{% if backfill.request.failed_jobs %} — {{ backfill.request.failed_jobs }} failed attempts{% endif %}</p>{% endif %}

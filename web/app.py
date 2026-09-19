@@ -20,6 +20,7 @@ from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
     Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage,
     User, UserJobState, CandidateProfile, UserPreference, Notification, AuditEvent,
+    UserSearchTerm, UserJobMatch,
 )
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
@@ -37,6 +38,11 @@ from job_agent.profile_store import (
 from job_agent.analytics import build_admin_analytics, resolve_date_range
 from job_agent.preflight import production_readiness
 from job_agent.backfill import backfill_progress, request_backfill
+from job_agent.user_search import (
+    ensure_user_search_terms,
+    normalize_search_term,
+    seed_legacy_job_matches,
+)
 
 
 
@@ -184,6 +190,23 @@ def owner_clause(column, request: Request):
     user_id = current_user_id(request)
     return column == user_id if user_id else column.is_(None)
 
+
+def assigned_job_clause(request: Request):
+    user_id = current_user_id(request)
+    if not user_id:
+        return None
+    return Job.id.in_(
+        select(UserJobMatch.job_id).where(UserJobMatch.user_id == user_id)
+    )
+
+
+def get_assigned_job(session, job_id: str, request: Request):
+    assignment = assigned_job_clause(request)
+    stmt = select(Job).where(Job.id == job_id)
+    if assignment is not None:
+        stmt = stmt.where(assignment)
+    return session.scalar(stmt)
+
 def current_resume_version(session, request: Request) -> str:
     user_id = current_user_id(request)
     profile = session.get(CandidateProfile, user_id) if user_id else None
@@ -223,6 +246,7 @@ def startup():
             admin,
             get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", "")),
         )
+        seed_legacy_job_matches(session)
 
 @app.get("/health")
 def health():
@@ -432,7 +456,11 @@ def dashboard(request: Request, sort: str = "newest_posted"):
         resume_version = current_resume_version(session, request)
         enabled = get_bool(session, "agent_enabled", True)
         latest_run = session.scalar(select(RunLog).order_by(desc(RunLog.started_at)).limit(1))
-        total_jobs = session.scalar(select(func.count(Job.id))) or 0
+        assignment = assigned_job_clause(request)
+        total_stmt = select(func.count(Job.id))
+        if assignment is not None:
+            total_stmt = total_stmt.where(assignment)
+        total_jobs = session.scalar(total_stmt) or 0
         strong = session.scalar(
             select(func.count(Evaluation.id)).where(
                 owner_clause(Evaluation.user_id, request),
@@ -440,7 +468,7 @@ def dashboard(request: Request, sort: str = "newest_posted"):
                 Evaluation.fit_score >= 75,
             )
         ) or 0
-        recent = session.execute(
+        recent_stmt = (
             select(Job, Evaluation, UserJobState)
             .join(
                 Evaluation,
@@ -460,8 +488,10 @@ def dashboard(request: Request, sort: str = "newest_posted"):
                 isouter=True,
             )
             .order_by(*job_sort_order(sort))
-            .limit(8)
-        ).all()
+        )
+        if assignment is not None:
+            recent_stmt = recent_stmt.where(assignment)
+        recent = session.execute(recent_stmt.limit(8)).all()
 
     return templates.TemplateResponse(
         request,
@@ -782,6 +812,9 @@ def jobs_page(
             )
             .order_by(*job_sort_order(sort))
         )
+        assignment = assigned_job_clause(request)
+        if assignment is not None:
+            stmt = stmt.where(assignment)
         if status:
             if current_user_id(request):
                 stmt = stmt.where(UserJobState.status == status)
@@ -803,7 +836,7 @@ def set_job_status(job_id: str, request: Request, status: str = Form(...)):
     if status not in allowed:
         return JSONResponse({"error": "invalid status"}, status_code=400)
     with SessionLocal() as session:
-        job = session.get(Job, job_id)
+        job = get_assigned_job(session, job_id, request)
         if job:
             user_id = current_user_id(request)
             if user_id:
@@ -824,7 +857,7 @@ def application_page(job_id: str, request: Request):
         return denial
 
     with SessionLocal() as session:
-        job = session.get(Job, job_id)
+        job = get_assigned_job(session, job_id, request)
         if not job:
             return HTMLResponse("Job not found", status_code=404)
 
@@ -875,7 +908,7 @@ def save_application_status(
     if status not in allowed:
         return JSONResponse({"error": "invalid status"}, status_code=400)
     with SessionLocal() as session:
-        job = session.get(Job, job_id)
+        job = get_assigned_job(session, job_id, request)
         if not job:
             return HTMLResponse("Job not found", status_code=404)
         state = get_or_create_job_state(session, user_id, job)
@@ -901,7 +934,7 @@ def build_application_package(job_id: str, request: Request):
         return denial
 
     with SessionLocal() as session:
-        job = session.get(Job, job_id)
+        job = get_assigned_job(session, job_id, request)
         if not job:
             return HTMLResponse("Job not found", status_code=404)
 
@@ -1106,6 +1139,7 @@ def create_user(
         session.add(user)
         session.commit()
         ensure_user_profile_records(session, user)
+        ensure_user_search_terms(session, user)
         record_audit(
             session,
             "user_created",
@@ -1152,6 +1186,7 @@ def user_profile_page(user_id: str, request: Request):
         if not user:
             return HTMLResponse("User not found", status_code=404)
         profile, preference = ensure_user_profile_records(session, user)
+        user_terms = ensure_user_search_terms(session, user)
         profile_json = json.dumps(profile.profile_data, indent=2, ensure_ascii=False)
         progress = backfill_progress(session, user.id, profile.resume_version)
     return templates.TemplateResponse(request, "user_profile.html", {
@@ -1160,6 +1195,7 @@ def user_profile_page(user_id: str, request: Request):
         "preference": preference,
         "profile_json": profile_json,
         "backfill": progress,
+        "user_terms": user_terms,
         "error": None,
     })
 
@@ -1198,6 +1234,7 @@ def save_user_profile(
         if not user:
             return HTMLResponse("User not found", status_code=404)
         profile, preference = ensure_user_profile_records(session, user)
+        user_terms = ensure_user_search_terms(session, user)
         if errors:
             progress = backfill_progress(session, user.id, profile.resume_version)
             return templates.TemplateResponse(request, "user_profile.html", {
@@ -1206,6 +1243,7 @@ def save_user_profile(
                 "preference": preference,
                 "profile_json": profile_json,
                 "backfill": progress,
+                "user_terms": user_terms,
                 "error": " ".join(errors),
             }, status_code=400)
 
@@ -1233,6 +1271,79 @@ def save_user_profile(
         f"/admin/users/{user_id}/profile?message=Profile+saved",
         status_code=303,
     )
+
+
+@app.post("/admin/users/{user_id}/search-terms")
+def add_user_search_term(user_id: str, request: Request, term: str = Form(...)):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    normalized = normalize_search_term(term)
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        exists = session.scalar(select(UserSearchTerm).where(
+            UserSearchTerm.user_id == user_id,
+            func.lower(UserSearchTerm.term) == normalized.lower(),
+        )) if normalized else None
+        if normalized and not exists:
+            new_term = UserSearchTerm(
+                user_id=user_id, term=normalized, enabled=True,
+                created_at=datetime.now(timezone.utc),
+            )
+            session.add(new_term)
+            session.commit()
+            record_audit(
+                session, "user_search_term_added",
+                actor_user_id=current_user_id(request), target_user_id=user_id,
+                request=request, detail={"term": normalized},
+            )
+    return RedirectResponse(f"/admin/users/{user_id}/profile", status_code=303)
+
+
+@app.post("/admin/users/{user_id}/search-terms/{term_id}/toggle")
+def toggle_user_search_term(user_id: str, term_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        term = session.scalar(select(UserSearchTerm).where(
+            UserSearchTerm.id == term_id,
+            UserSearchTerm.user_id == user_id,
+        ))
+        if term:
+            term.enabled = not term.enabled
+            session.commit()
+            record_audit(
+                session, "user_search_term_toggled",
+                actor_user_id=current_user_id(request), target_user_id=user_id,
+                request=request,
+                detail={"term": term.term, "enabled": term.enabled},
+            )
+    return RedirectResponse(f"/admin/users/{user_id}/profile", status_code=303)
+
+
+@app.post("/admin/users/{user_id}/search-terms/{term_id}/delete")
+def delete_user_search_term(user_id: str, term_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        term = session.scalar(select(UserSearchTerm).where(
+            UserSearchTerm.id == term_id,
+            UserSearchTerm.user_id == user_id,
+        ))
+        if term:
+            deleted_term = term.term
+            session.delete(term)
+            session.commit()
+            record_audit(
+                session, "user_search_term_deleted",
+                actor_user_id=current_user_id(request), target_user_id=user_id,
+                request=request, detail={"term": deleted_term},
+            )
+    return RedirectResponse(f"/admin/users/{user_id}/profile", status_code=303)
 
 
 @app.post("/admin/users/{user_id}/backfill")

@@ -16,6 +16,7 @@ from job_agent.models import (
     Job,
     Notification,
     User,
+    UserJobMatch,
 )
 from job_agent.pipeline import evaluate_for_target
 from web.auth import hash_password
@@ -59,6 +60,11 @@ def seed_profile_and_jobs(session, count=3):
             freshness_status="verified_fresh",
         )
         session.add(job)
+        session.flush()
+        session.add(UserJobMatch(
+            user_id=user.id, job_id=job.id, search_term="test",
+            first_matched_at=now, last_matched_at=now,
+        ))
         jobs.append(job)
     session.commit()
     return user, profile_data, jobs
