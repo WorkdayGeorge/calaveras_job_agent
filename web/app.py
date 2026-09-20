@@ -60,8 +60,10 @@ from .auth import (
     normalize_login_email,
     record_audit,
     token_digest,
+    update_user_identity,
     utc_aware,
     verify_password,
+    set_temporary_password,
 )
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -1174,6 +1176,148 @@ def change_user_status(user_id: str, request: Request, status: str = Form(...)):
                 detail={"status": status},
             )
     return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.get("/admin/users/{user_id}/account", response_class=HTMLResponse)
+def user_account_page(user_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        profile = session.get(CandidateProfile, user_id)
+        progress = (
+            backfill_progress(session, user_id, profile.resume_version)
+            if profile else {"completed": 0, "pending": 0, "request": None}
+        )
+        term_count = session.scalar(select(func.count(UserSearchTerm.id)).where(
+            UserSearchTerm.user_id == user_id,
+            UserSearchTerm.enabled.is_(True),
+        )) or 0
+    return templates.TemplateResponse(request, "user_account.html", {
+        "user": user,
+        "profile": profile,
+        "term_count": term_count,
+        "backfill": progress,
+    })
+
+
+@app.post("/admin/users/{user_id}/account/identity")
+def edit_user_identity(
+    user_id: str,
+    request: Request,
+    display_name: str = Form(...),
+    email: str = Form(...),
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        old_email = user.email
+        try:
+            update_user_identity(session, user, email, display_name)
+        except ValueError as exc:
+            return RedirectResponse(
+                f"/admin/users/{user_id}/account?message={str(exc).replace(' ', '+')}",
+                status_code=303,
+            )
+        record_audit(
+            session, "user_identity_updated",
+            actor_user_id=current_user_id(request), target_user_id=user_id,
+            request=request,
+            detail={"old_email": old_email, "new_email": user.email},
+        )
+        if user_id == current_user_id(request):
+            request.session["email"] = user.email
+    return RedirectResponse(
+        f"/admin/users/{user_id}/account?message=Account+updated",
+        status_code=303,
+    )
+
+
+@app.post("/admin/users/{user_id}/account/temporary-password")
+def issue_temporary_password(
+    user_id: str,
+    request: Request,
+    temporary_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    if user_id == current_user_id(request):
+        return RedirectResponse(
+            f"/admin/users/{user_id}/account?message=Use+Forgot+password+for+your+own+account",
+            status_code=303,
+        )
+    if temporary_password != confirm_password:
+        return RedirectResponse(
+            f"/admin/users/{user_id}/account?message=Passwords+do+not+match",
+            status_code=303,
+        )
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        try:
+            set_temporary_password(session, user, temporary_password)
+        except ValueError as exc:
+            return RedirectResponse(
+                f"/admin/users/{user_id}/account?message={str(exc).replace(' ', '+')}",
+                status_code=303,
+            )
+        record_audit(
+            session, "temporary_password_issued",
+            actor_user_id=current_user_id(request), target_user_id=user_id,
+            request=request,
+        )
+    return RedirectResponse(
+        f"/admin/users/{user_id}/account?message=Temporary+password+updated",
+        status_code=303,
+    )
+
+
+@app.post("/admin/users/{user_id}/account/send-onboarding")
+def send_user_onboarding(user_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        if user.status != "active":
+            return RedirectResponse(
+                f"/admin/users/{user_id}/account?message=Activate+the+account+before+sending+onboarding",
+                status_code=303,
+            )
+        login_url = (env("PUBLIC_BASE_URL") or str(request.base_url)).rstrip("/") + "/login"
+        sent, _ = email_text(
+            user.email,
+            "Your Calaveras Job Agent account",
+            f"Hello {user.display_name},\n\n"
+            "Your administrator has created your Calaveras Job Agent account. "
+            "Use the temporary password provided separately. After signing in, "
+            "a six-digit verification code will be emailed to you and you will "
+            "be required to choose a new password.\n\n"
+            f"Sign in: {login_url}\n\n"
+            "If you were not expecting this account, contact your administrator.",
+        )
+        record_audit(
+            session,
+            "onboarding_email_sent" if sent else "onboarding_email_failed",
+            actor_user_id=current_user_id(request), target_user_id=user_id,
+            request=request,
+        )
+    message = "Onboarding+email+sent" if sent else "Onboarding+email+could+not+be+sent"
+    return RedirectResponse(
+        f"/admin/users/{user_id}/account?message={message}", status_code=303
+    )
 
 
 @app.get("/admin/users/{user_id}/profile", response_class=HTMLResponse)

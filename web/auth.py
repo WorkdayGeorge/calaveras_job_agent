@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 
 from job_agent.config import env
-from job_agent.models import AuditEvent, AuthToken, User
+from job_agent.models import AuditEvent, AuthToken, User, UserPreference
 from job_agent.notify import normalize_email_address
 
 
@@ -150,6 +150,46 @@ def consume_token(session, user: User, purpose: str, raw_token: str, max_attempt
         token.used_at = now
     session.commit()
     return valid
+
+
+def invalidate_unused_tokens(session, user_id: str) -> None:
+    session.execute(
+        update(AuthToken)
+        .where(AuthToken.user_id == user_id, AuthToken.used_at.is_(None))
+        .values(used_at=datetime.now(timezone.utc))
+    )
+
+
+def update_user_identity(session, user: User, email: str, display_name: str) -> None:
+    normalized = normalize_login_email(email)
+    if not normalized:
+        raise ValueError("Enter a valid email address.")
+    collision = session.scalar(
+        select(User).where(User.email == normalized, User.id != user.id)
+    )
+    if collision:
+        raise ValueError("That email address already belongs to another account.")
+    old_email = user.email
+    user.email = normalized
+    user.display_name = display_name.strip() or normalized
+    user.updated_at = datetime.now(timezone.utc)
+    preference = session.get(UserPreference, user.id)
+    if preference and preference.notification_email.lower() == old_email.lower():
+        preference.notification_email = normalized
+        preference.updated_at = user.updated_at
+    if old_email != normalized:
+        invalidate_unused_tokens(session, user.id)
+    session.commit()
+
+
+def set_temporary_password(session, user: User, password: str) -> None:
+    user.password_hash = hash_password(password)
+    user.must_change_password = True
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.updated_at = datetime.now(timezone.utc)
+    invalidate_unused_tokens(session, user.id)
+    session.commit()
 
 
 def record_audit(session, event_type: str, actor_user_id=None, target_user_id=None, request=None, detail=None):

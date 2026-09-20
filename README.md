@@ -145,6 +145,15 @@ deduplicated, while Dashboard, Jobs, applications, evaluations, and alerts are
 restricted to each user's assigned openings. The first rollout creates legacy
 assignments so existing users do not lose access to their current job history.
 
+The administrator **Account** page supports concierge onboarding and account
+lifecycle management. Administrators can correct a user's name or login email,
+issue a replacement temporary password, and send password-free onboarding
+instructions. Email changes preserve an intentionally separate notification
+address, invalidate unused verification/reset tokens, and are audited. The
+Users and Account pages show first-login, profile, search-term, score-backfill,
+access, and last-login status. Temporary passwords are never emailed or shown
+after submission.
+
 ## Worker only
 
 ```bash
