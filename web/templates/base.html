@@ -20,11 +20,12 @@
     .good { color:var(--good); font-weight:700; }
     .bad { color:var(--bad); font-weight:700; }
     .warn { color:var(--warn); font-weight:700; }
-    .btn { display:inline-block; border:0; border-radius:9px; padding:10px 14px; background:var(--accent); color:#fff; cursor:pointer; text-decoration:none; font-weight:650; }
+    .btn { display:inline-block; border:0; border-radius:7px; padding:5px 8px; background:var(--accent); color:#fff; cursor:pointer; text-decoration:none; font-size:12.5px; line-height:1.25; font-weight:650; vertical-align:middle; }
     .btn.secondary { background:#475467; }
     .btn.danger { background:#b42318; }
     .btn.good { background:#16803c; }
     form.inline { display:inline; }
+    form.inline + form.inline { margin-left:4px; }
     table { width:100%; border-collapse:collapse; background:white; border-radius:12px; overflow:hidden; }
     th,td { text-align:left; padding:12px; border-bottom:1px solid var(--line); vertical-align:top; }
     th { background:#f8fafc; font-size:13px; color:#475467; }
@@ -35,7 +36,7 @@
     .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; font-size:12px; font-weight:700; }
     h1 { margin-top:0; }
     h2 { margin-top:28px; }
-    @media (max-width:760px) { header { align-items:flex-start; flex-direction:column; } table { font-size:13px; } }
+    @media (max-width:760px) { header { align-items:flex-start; flex-direction:column; } table { font-size:13px; } .btn { padding:7px 9px; font-size:13px; } }
   </style>
 </head>
 <body>
