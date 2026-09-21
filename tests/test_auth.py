@@ -14,6 +14,7 @@ from web.auth import (
     update_user_identity,
     verify_password,
 )
+from web.app import administrator_notification_email
 
 
 def make_session():
@@ -137,6 +138,28 @@ def test_email_correction_does_not_overwrite_custom_notification_address():
     session.commit()
     update_user_identity(session, user, "new@example.com", "New Name")
     assert session.get(UserPreference, user.id).notification_email == "alerts@example.net"
+
+
+def test_admin_test_email_uses_profile_notification_address(monkeypatch):
+    session = make_session()
+    user = make_user(session)
+    now = datetime.now(timezone.utc)
+    session.add(UserPreference(
+        user_id=user.id, notification_email="admin-alerts@example.net",
+        immediate_alerts=True, daily_digest=True, digest_time="17:05",
+        created_at=now, updated_at=now,
+    ))
+    session.commit()
+    monkeypatch.setenv("ALERT_EMAIL_TO", "legacy@example.com")
+
+    assert administrator_notification_email(session, user.id) == "admin-alerts@example.net"
+
+
+def test_admin_test_email_falls_back_to_login_email_without_preferences():
+    session = make_session()
+    user = make_user(session)
+
+    assert administrator_notification_email(session, user.id) == user.email
 
 
 def test_user_email_cannot_collide_with_another_account():
