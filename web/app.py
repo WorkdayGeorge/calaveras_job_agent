@@ -188,6 +188,18 @@ def admin_user(request: Request) -> bool:
 def current_user_id(request: Request) -> str | None:
     return request.session.get("user_id")
 
+
+def administrator_notification_email(session, user_id: str | None) -> str:
+    """Resolve the dashboard test-email recipient for the signed-in admin."""
+    user = session.get(User, user_id) if user_id else None
+    preference = session.get(UserPreference, user_id) if user_id else None
+    if preference and preference.notification_email:
+        return preference.notification_email
+    if user:
+        return user.email
+    return env("ALERT_EMAIL_TO", "")
+
+
 def owner_clause(column, request: Request):
     user_id = current_user_id(request)
     return column == user_id if user_id else column.is_(None)
@@ -550,13 +562,9 @@ def test_email(request: Request):
     }
 
     with SessionLocal() as session:
-        recipient = (
-            get_setting(
-                session,
-                "alert_email_to",
-                env("ALERT_EMAIL_TO", ""),
-            )
-            or env("ALERT_EMAIL_TO", "")
+        recipient = administrator_notification_email(
+            session,
+            current_user_id(request),
         )
 
     sent, result = email_notify(
@@ -600,9 +608,6 @@ def settings_page(request: Request):
             "schedule_stop_time": get_setting(
                  session, "schedule_stop_time", "17:00"
             ),
-            "high_priority_digest_time": get_setting(
-                 session, "high_priority_digest_time", "17:05"
-            ),
             "schedule_days": {
                  int(day)
                  for day in (
@@ -610,14 +615,6 @@ def settings_page(request: Request):
                  ).split(",")
                  if day.strip().isdigit()
             },
-            "alert_email_to": (
-                get_setting(
-                    session,
-                    "alert_email_to",
-                    env("ALERT_EMAIL_TO", ""),
-                )
-                or env("ALERT_EMAIL_TO", "")
-            ),
         }
     return templates.TemplateResponse(
         request,
@@ -636,27 +633,13 @@ def save_settings(
     schedule_interval_minutes: int = Form(...),
     schedule_start_time: str = Form(...),
     schedule_stop_time: str = Form(...),
-    high_priority_digest_time: str = Form(...),
     schedule_days: list[str] = Form([]),
     allow_unverified_current_jobs_in_digest: str | None = Form(None),
-    alert_email_to: str = Form(""),
 ):
     denial = require_admin(request)
     if denial:
         return denial
-    recipient_input = alert_email_to.strip()
-    validated_recipient = (
-        normalize_email_address(recipient_input)
-        if recipient_input
-        else ""
-    )
-    if recipient_input and not validated_recipient:
-        return RedirectResponse(
-            "/settings?message=Enter+a+valid+single+email+address",
-            status_code=303,
-        )
     with SessionLocal() as session:
-        set_setting(session, "alert_email_to", validated_recipient)
         set_setting(
             session,
             "fresh_job_window_minutes",
@@ -693,17 +676,6 @@ def save_settings(
             datetime.strptime(schedule_stop_time, "%H:%M")
         except ValueError:
             schedule_stop_time = "17:00"
-
-        try:
-            datetime.strptime(high_priority_digest_time, "%H:%M")
-        except ValueError:
-            high_priority_digest_time = "17:05"
-
-        set_setting(
-            session,
-            "high_priority_digest_time",
-            high_priority_digest_time,
-        )
 
         valid_days = sorted({
             int(day)
