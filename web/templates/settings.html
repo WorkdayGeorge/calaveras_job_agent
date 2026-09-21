@@ -1,7 +1,7 @@
 \
 {% extends "base.html" %}
 {% block content %}
-<h1>Agent Settings</h1>
+<h1>System Settings</h1>
 {% set message = request.query_params.get("message") %}
 {% if message %}
   <div class="card {% if 'valid' in message|lower %}bad{% else %}good{% endif %}" style="margin-bottom:18px">
@@ -11,24 +11,7 @@
 <div class="card">
 <form method="post" action="/settings">
 
-  <h2 style="margin-top:0">Email Alerts</h2>
-  <div class="row">
-    <div>
-      <label>Legacy/default alert email</label>
-      <input
-        type="email"
-        name="alert_email_to"
-        value="{{ values.alert_email_to }}"
-        placeholder="name@example.com"
-        autocomplete="email"
-      >
-    </div>
-  </div>
-  <p class="muted">
-    Used only by legacy mode and dashboard test emails. Active database users receive alerts at the address configured under Users → Profile &amp; alerts. SMTP credentials remain in Secret Manager.
-  </p>
-
-  <h2>Search Schedule</h2>
+  <h2 style="margin-top:0">Search Schedule</h2>
 
   <p class="muted">
     Scheduled searches use Pacific Time. Run Search Now can be used at any time.
@@ -68,20 +51,10 @@
       >
     </div>
 
-    <div>
-      <label>High-priority digest time</label>
-      <input
-        type="time"
-        name="high_priority_digest_time"
-        value="{{ values.high_priority_digest_time }}"
-        step="300"
-        required
-      >
-    </div>
   </div>
 
   <p class="muted">
-    Strong-fit jobs with unverified posting times are held and sent once per day at the digest time above.
+    Each user's notification address and digest time are managed under Users → Profile &amp; alerts.
   </p>
 
   <label style="margin-top:18px">Active days</label>
