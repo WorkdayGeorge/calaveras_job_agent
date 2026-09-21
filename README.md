@@ -135,7 +135,10 @@ one execution remains unscored and resumes safely when the job is encountered
 again. Administrators can queue an existing-job score backfill from a user's
 **Profile & alerts** page; progress is shown there, processing occurs in small
 batches, and historical backfills never send job-alert emails. The global
-Settings email is retained only as a legacy/default and dashboard-test address.
+email and digest settings remain internal legacy-mode fallbacks and are not
+shown in the database-authenticated administrator workflow. Dashboard test
+emails use the signed-in administrator's notification address from **Users →
+Profile & alerts**.
 
 Search terms are user-specific and administrator-managed. Global terms on the
 Settings page are defaults copied to new accounts. The worker combines active
@@ -153,6 +156,11 @@ address, invalidate unused verification/reset tokens, and are audited. The
 Users and Account pages show first-login, profile, search-term, score-backfill,
 access, and last-login status. Temporary passwords are never emailed or shown
 after submission.
+
+The administrator **System Settings** page contains only system-wide search,
+scoring, batch, and new-user default controls. User-specific identity, alert,
+digest, profile, and search-term settings remain under **Users**. Action buttons
+use a compact layout on desktop while retaining larger mobile touch targets.
 
 ## Worker only
 
