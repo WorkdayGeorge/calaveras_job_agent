@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy import select, desc, func, and_
+from sqlalchemy import select, desc, func, and_, case
 
 from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
@@ -141,6 +141,89 @@ def job_sort_order(sort_by):
         Job.posted_at.desc(),
         Job.first_seen_at.desc(),
     )
+
+
+def administrator_job_rows(session, sort_by: str = "newest_posted"):
+    """Return jobs with current, cross-user fit and application metrics."""
+    assignments = (
+        select(
+            UserJobMatch.user_id.label("user_id"),
+            UserJobMatch.job_id.label("job_id"),
+        )
+        .join(User, User.id == UserJobMatch.user_id)
+        .where(User.status == "active")
+        .distinct()
+        .subquery()
+    )
+
+    assigned_users = func.count(func.distinct(assignments.c.user_id))
+    evaluated_users = func.count(func.distinct(case(
+        (Evaluation.id.is_not(None), assignments.c.user_id),
+        else_=None,
+    )))
+    best_fit = func.max(Evaluation.fit_score)
+    average_fit = func.avg(Evaluation.fit_score)
+    strong_fits = func.count(func.distinct(case(
+        (Evaluation.fit_score >= 75, assignments.c.user_id),
+        else_=None,
+    )))
+    apply_recommendations = func.count(func.distinct(case(
+        (func.lower(Evaluation.recommendation) == "apply", assignments.c.user_id),
+        else_=None,
+    )))
+    applied_users = func.count(func.distinct(case(
+        (
+            (UserJobState.applied_at.is_not(None))
+            | (UserJobState.status.in_({"applied", "interview", "hired"})),
+            assignments.c.user_id,
+        ),
+        else_=None,
+    )))
+
+    stmt = (
+        select(
+            Job,
+            assigned_users.label("assigned_users"),
+            evaluated_users.label("evaluated_users"),
+            best_fit.label("best_fit"),
+            average_fit.label("average_fit"),
+            strong_fits.label("strong_fits"),
+            apply_recommendations.label("apply_recommendations"),
+            applied_users.label("applied_users"),
+        )
+        .join(assignments, assignments.c.job_id == Job.id)
+        .join(
+            CandidateProfile,
+            CandidateProfile.user_id == assignments.c.user_id,
+            isouter=True,
+        )
+        .join(
+            Evaluation,
+            and_(
+                Evaluation.job_id == Job.id,
+                Evaluation.user_id == assignments.c.user_id,
+                Evaluation.resume_version == CandidateProfile.resume_version,
+            ),
+            isouter=True,
+        )
+        .join(
+            UserJobState,
+            and_(
+                UserJobState.job_id == Job.id,
+                UserJobState.user_id == assignments.c.user_id,
+            ),
+            isouter=True,
+        )
+        .group_by(*Job.__table__.columns)
+    )
+
+    if sort_by == "highest_fit":
+        stmt = stmt.order_by(best_fit.desc().nullslast(), Job.posted_at.desc().nullslast())
+    elif sort_by == "lowest_fit":
+        stmt = stmt.order_by(best_fit.asc().nullslast(), Job.posted_at.desc().nullslast())
+    else:
+        stmt = stmt.order_by(*job_sort_order(sort_by))
+    return session.execute(stmt.limit(250)).all()
 
 app = FastAPI(title="Calaveras Job Agent")
 
@@ -764,6 +847,19 @@ def jobs_page(
     if denial:
         return denial
     with SessionLocal() as session:
+        if admin_user(request):
+            rows = administrator_job_rows(session, sort)
+            return templates.TemplateResponse(
+                request,
+                "jobs.html",
+                {
+                    "rows": rows,
+                    "status_filter": None,
+                    "sort_by": sort,
+                    "administrator_view": True,
+                },
+            )
+
         resume_version = current_resume_version(session, request)
         stmt = (
             select(Job, Evaluation, UserJobState)
@@ -798,7 +894,12 @@ def jobs_page(
     return templates.TemplateResponse(
         request,
         "jobs.html",
-        {"rows": rows, "status_filter": status, "sort_by": sort}
+        {
+            "rows": rows,
+            "status_filter": status,
+            "sort_by": sort,
+            "administrator_view": False,
+        }
     )
 
 @app.post("/jobs/{job_id}/status")
