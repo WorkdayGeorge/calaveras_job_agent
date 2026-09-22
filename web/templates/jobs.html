@@ -2,6 +2,8 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Jobs</h1>
+{% set message = request.query_params.get("message") %}
+{% if message %}<div class="card good" style="margin-bottom:18px">{{ message }}</div>{% endif %}
 {% if administrator_view %}
 <p class="muted">Review current fit and application activity across active users.</p>
 {% else %}
@@ -26,8 +28,8 @@
 </form>
 <table>
 {% if administrator_view %}
-<tr><th>Job</th><th>Posted</th><th>User Fit</th><th>Apply Activity</th><th>Posting</th></tr>
-{% for job, assigned_users, evaluated_users, best_fit, average_fit, strong_fits, apply_recommendations, applied_users in rows %}
+<tr><th>Job</th><th>Posted</th><th>User Fit</th><th>Apply Activity</th><th>Actions</th></tr>
+{% for job, assigned_users, evaluated_users, best_fit, average_fit, strong_fits, apply_recommendations, notified_users, applied_users in rows %}
 <tr>
 <td><strong>{{ job.title }}</strong><br>{{ job.company }}<br><span class="muted">{{ job.location or "—" }}</span></td>
 <td>{{ job.posted_at|pacific_time if job.posted_at else "Unverified" }}<br><span class="muted">{{ job.freshness_status }}</span></td>
@@ -42,9 +44,13 @@
 </td>
 <td>
   <strong>{{ apply_recommendations }}</strong> recommended<br>
+  <strong>{{ notified_users }}</strong> notified<br>
   <strong>{{ applied_users }}</strong> applied
 </td>
-<td><a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener">View Job</a></td>
+<td>
+  <a class="btn secondary" href="{{ job.apply_url }}" target="_blank" rel="noopener">View Job</a>
+  {% if evaluated_users %}<a class="btn" href="/admin/jobs/{{ job.id }}/notify">Notify Users</a>{% endif %}
+</td>
 </tr>
 {% else %}<tr><td colspan="5">No assigned jobs stored yet.</td></tr>{% endfor %}
 {% else %}
