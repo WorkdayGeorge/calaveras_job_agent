@@ -214,7 +214,10 @@ def administrator_job_rows(session, sort_by: str = "newest_posted"):
             ),
             isouter=True,
         )
-        .group_by(*Job.__table__.columns)
+        # PostgreSQL can project a table's columns when grouped by its primary
+        # key. Grouping every column would include Job.requirements (JSON),
+        # which has no PostgreSQL equality operator.
+        .group_by(Job.id)
     )
 
     if sort_by == "highest_fit":
