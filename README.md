@@ -165,6 +165,12 @@ The administrator **Jobs** page summarizes each opening across active assigned
 users, including best and average current fit, strong-fit count, scoring
 coverage, apply recommendations, and recorded applications. Regular users retain
 their personal recommendation, status, and application controls.
+Administrators can review and send a job alert to selected scored users from
+that page. Apply-recommended users who have not received the opening are
+preselected; successful prior deliveries are protected from duplicates unless
+the administrator explicitly enables a resend. Attempts are recorded in
+Notifications, included in the per-job notified count, and summarized in the
+Audit Log.
 
 ## Worker only
 
