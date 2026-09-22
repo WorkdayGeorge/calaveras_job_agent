@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Notify Users</h1>
+<div class="card" style="margin-bottom:18px">
+  <strong>{{ job.title }}</strong><br>
+  {{ job.company }}<br>
+  <span class="muted">{{ job.location or "Location not supplied" }}</span>
+</div>
+
+{% set message = request.query_params.get("message") %}
+{% if message %}<div class="card bad" style="margin-bottom:18px">{{ message }}</div>{% endif %}
+
+<form method="post" action="/admin/jobs/{{ job.id }}/notify">
+<table>
+  <tr><th>Send</th><th>User</th><th>Fit</th><th>Recommendation</th><th>Recipient</th><th>History</th></tr>
+  {% for candidate in candidates %}
+  <tr>
+    <td><input style="width:auto" type="checkbox" name="user_ids" value="{{ candidate.user.id }}" {% if candidate.recommended and not candidate.previously_notified %}checked{% endif %}></td>
+    <td><strong>{{ candidate.user.display_name }}</strong><br><span class="muted">{{ candidate.user.email }}</span></td>
+    <td><strong>{{ candidate.evaluation.fit_score }}%</strong><br>{{ candidate.evaluation.classification }}</td>
+    <td>{{ candidate.evaluation.recommendation }}</td>
+    <td>{{ candidate.recipient }}</td>
+    <td>{% if candidate.previously_notified %}<span class="warn">Previously notified</span>{% else %}<span class="muted">Not sent</span>{% endif %}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="6">No active assigned users have a current fit score for this job.</td></tr>
+  {% endfor %}
+</table>
+
+{% if candidates %}
+<div class="card" style="margin-top:18px">
+  <label><input style="width:auto" type="checkbox" name="allow_resend"> Allow sending again to previously notified users</label>
+  <p class="muted">Users recommended to apply are selected automatically unless they have already received this job.</p>
+  <button class="btn good" type="submit">Send Selected Notifications</button>
+  <a class="btn secondary" href="/jobs">Cancel</a>
+</div>
+{% else %}
+<p><a class="btn secondary" href="/jobs">Back to Jobs</a></p>
+{% endif %}
+</form>
+{% endblock %}
