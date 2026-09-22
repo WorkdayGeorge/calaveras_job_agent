@@ -2,7 +2,11 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Jobs</h1>
+{% if administrator_view %}
+<p class="muted">Review current fit and application activity across active users.</p>
+{% else %}
 <p class="muted">Track each opportunity from discovery through application.</p>
+{% endif %}
 <form method="get" action="/jobs" style="margin-bottom:18px">
   {% if status_filter %}
   <input type="hidden" name="status" value="{{ status_filter }}">
@@ -13,14 +17,37 @@
     <option value="newest_posted" {% if sort_by == "newest_posted" %}selected{% endif %}>Newest posting</option>
     <option value="oldest_posted" {% if sort_by == "oldest_posted" %}selected{% endif %}>Oldest posting</option>
     <option value="newest_found" {% if sort_by == "newest_found" %}selected{% endif %}>Newest found</option>
-    <option value="highest_fit" {% if sort_by == "highest_fit" %}selected{% endif %}>Highest fit</option>
-    <option value="lowest_fit" {% if sort_by == "lowest_fit" %}selected{% endif %}>Lowest fit</option>
+    <option value="highest_fit" {% if sort_by == "highest_fit" %}selected{% endif %}>Highest {% if administrator_view %}user {% endif %}fit</option>
+    <option value="lowest_fit" {% if sort_by == "lowest_fit" %}selected{% endif %}>Lowest {% if administrator_view %}user {% endif %}fit</option>
     <option value="title" {% if sort_by == "title" %}selected{% endif %}>Job title A-Z</option>
     <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
   </select>
   <button class="btn secondary" style="margin-top:8px">Apply sort</button>
 </form>
 <table>
+{% if administrator_view %}
+<tr><th>Job</th><th>Posted</th><th>User Fit</th><th>Apply Activity</th><th>Posting</th></tr>
+{% for job, assigned_users, evaluated_users, best_fit, average_fit, strong_fits, apply_recommendations, applied_users in rows %}
+<tr>
+<td><strong>{{ job.title }}</strong><br>{{ job.company }}<br><span class="muted">{{ job.location or "—" }}</span></td>
+<td>{{ job.posted_at|pacific_time if job.posted_at else "Unverified" }}<br><span class="muted">{{ job.freshness_status }}</span></td>
+<td>
+  {% if evaluated_users %}
+  <strong>Best {{ best_fit }}%</strong><br>
+  Average {{ average_fit|round|int }}%<br>
+  <span class="muted">{{ strong_fits }} strong · {{ evaluated_users }}/{{ assigned_users }} scored</span>
+  {% else %}
+  <span class="muted">0/{{ assigned_users }} scored</span>
+  {% endif %}
+</td>
+<td>
+  <strong>{{ apply_recommendations }}</strong> recommended<br>
+  <strong>{{ applied_users }}</strong> applied
+</td>
+<td><a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener">View Job</a></td>
+</tr>
+{% else %}<tr><td colspan="5">No assigned jobs stored yet.</td></tr>{% endfor %}
+{% else %}
 <tr><th>Job</th><th>Posted</th><th>Fit</th><th>Recommendation</th><th>Status</th><th>Apply</th></tr>
 {% for job, ev, state in rows %}
 <tr>
@@ -42,5 +69,6 @@
 </td>
 </tr>
 {% else %}<tr><td colspan="6">No jobs stored yet.</td></tr>{% endfor %}
+{% endif %}
 </table>
 {% endblock %}
