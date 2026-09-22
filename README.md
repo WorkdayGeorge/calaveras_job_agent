@@ -161,6 +161,10 @@ The administrator **System Settings** page contains only system-wide search,
 scoring, batch, and new-user default controls. User-specific identity, alert,
 digest, profile, and search-term settings remain under **Users**. Action buttons
 use a compact layout on desktop while retaining larger mobile touch targets.
+The administrator **Jobs** page summarizes each opening across active assigned
+users, including best and average current fit, strong-fit count, scoring
+coverage, apply recommendations, and recorded applications. Regular users retain
+their personal recommendation, status, and application controls.
 
 ## Worker only
 
