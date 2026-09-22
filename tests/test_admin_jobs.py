@@ -8,11 +8,17 @@ from job_agent.models import (
     CandidateProfile,
     Evaluation,
     Job,
+    Notification,
     User,
     UserJobMatch,
+    UserPreference,
     UserJobState,
 )
-from web.app import administrator_job_rows
+from web.app import (
+    administrator_job_rows,
+    administrator_notification_candidates,
+    send_administrator_job_notifications,
+)
 from web.auth import hash_password
 
 
@@ -41,6 +47,15 @@ def add_user(session, email, now):
         resume_version="profile-v2",
         version=2,
         is_active=True,
+        created_at=now,
+        updated_at=now,
+    ))
+    session.add(UserPreference(
+        user_id=user.id,
+        notification_email=f"alerts-{email}",
+        immediate_alerts=True,
+        daily_digest=True,
+        digest_time="17:05",
         created_at=now,
         updated_at=now,
     ))
@@ -119,4 +134,71 @@ def test_administrator_job_rows_aggregate_current_user_metrics():
     assert float(row.average_fit) == 75.0
     assert row.strong_fits == 1
     assert row.apply_recommendations == 1
+    assert row.notified_users == 0
     assert row.applied_users == 1
+
+
+def test_administrator_notifications_require_review_and_prevent_duplicates():
+    session = make_session()
+    now = datetime.now(timezone.utc)
+    user = add_user(session, "person@example.com", now)
+    job = Job(
+        title="Bookkeeper",
+        company="Example Company",
+        apply_url="https://example.com/bookkeeper",
+        source="example",
+        first_seen_at=now,
+        last_seen_at=now,
+        job_fingerprint="b" * 64,
+        is_local=True,
+        freshness_status="verified_fresh",
+    )
+    session.add(job)
+    session.flush()
+    session.add(UserJobMatch(
+        user_id=user.id,
+        job_id=job.id,
+        search_term="bookkeeper",
+        first_matched_at=now,
+        last_matched_at=now,
+    ))
+    add_evaluation(session, user, job, 88, "Apply", now)
+    session.commit()
+
+    deliveries = []
+
+    def fake_sender(job_payload, evaluation_payload, bucket, recipient=None):
+        deliveries.append((job_payload, evaluation_payload, bucket, recipient))
+        return True, "sent"
+
+    candidates = administrator_notification_candidates(session, job.id)
+    assert candidates[0]["recommended"] is True
+    assert candidates[0]["previously_notified"] is False
+    assert candidates[0]["recipient"] == "alerts-person@example.com"
+
+    first = send_administrator_job_notifications(
+        session, job, candidates, {user.id}, sender=fake_sender
+    )
+    assert first == {"sent": 1, "failed": 0, "skipped": 0}
+    assert len(deliveries) == 1
+    assert session.query(Notification).count() == 1
+
+    candidates = administrator_notification_candidates(session, job.id)
+    assert candidates[0]["previously_notified"] is True
+    duplicate = send_administrator_job_notifications(
+        session, job, candidates, {user.id}, sender=fake_sender
+    )
+    assert duplicate == {"sent": 0, "failed": 0, "skipped": 1}
+    assert len(deliveries) == 1
+
+    resend = send_administrator_job_notifications(
+        session,
+        job,
+        candidates,
+        {user.id},
+        allow_resend=True,
+        sender=fake_sender,
+    )
+    assert resend == {"sent": 1, "failed": 0, "skipped": 0}
+    assert len(deliveries) == 2
+    assert administrator_job_rows(session)[0].notified_users == 1
