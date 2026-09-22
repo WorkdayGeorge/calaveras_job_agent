@@ -155,6 +155,15 @@ def administrator_job_rows(session, sort_by: str = "newest_posted"):
         .distinct()
         .subquery()
     )
+    delivered = (
+        select(
+            Notification.user_id.label("user_id"),
+            Notification.job_id.label("job_id"),
+        )
+        .where(Notification.status == "sent")
+        .distinct()
+        .subquery()
+    )
 
     assigned_users = func.count(func.distinct(assignments.c.user_id))
     evaluated_users = func.count(func.distinct(case(
@@ -179,6 +188,7 @@ def administrator_job_rows(session, sort_by: str = "newest_posted"):
         ),
         else_=None,
     )))
+    notified_users = func.count(func.distinct(delivered.c.user_id))
 
     stmt = (
         select(
@@ -189,6 +199,7 @@ def administrator_job_rows(session, sort_by: str = "newest_posted"):
             average_fit.label("average_fit"),
             strong_fits.label("strong_fits"),
             apply_recommendations.label("apply_recommendations"),
+            notified_users.label("notified_users"),
             applied_users.label("applied_users"),
         )
         .join(assignments, assignments.c.job_id == Job.id)
@@ -214,6 +225,14 @@ def administrator_job_rows(session, sort_by: str = "newest_posted"):
             ),
             isouter=True,
         )
+        .join(
+            delivered,
+            and_(
+                delivered.c.job_id == Job.id,
+                delivered.c.user_id == assignments.c.user_id,
+            ),
+            isouter=True,
+        )
         # PostgreSQL can project a table's columns when grouped by its primary
         # key. Grouping every column would include Job.requirements (JSON),
         # which has no PostgreSQL equality operator.
@@ -227,6 +246,116 @@ def administrator_job_rows(session, sort_by: str = "newest_posted"):
     else:
         stmt = stmt.order_by(*job_sort_order(sort_by))
     return session.execute(stmt.limit(250)).all()
+
+
+def administrator_notification_candidates(session, job_id: str) -> list[dict]:
+    """Return active, assigned users with a score for administrator review."""
+    assignments = (
+        select(UserJobMatch.user_id)
+        .where(UserJobMatch.job_id == job_id)
+        .distinct()
+        .subquery()
+    )
+    delivered = (
+        select(Notification.user_id)
+        .where(
+            Notification.job_id == job_id,
+            Notification.status == "sent",
+        )
+        .distinct()
+        .subquery()
+    )
+    rows = session.execute(
+        select(
+            User,
+            UserPreference,
+            Evaluation,
+            delivered.c.user_id.label("notified_user_id"),
+        )
+        .join(assignments, assignments.c.user_id == User.id)
+        .join(CandidateProfile, CandidateProfile.user_id == User.id)
+        .join(
+            Evaluation,
+            and_(
+                Evaluation.user_id == User.id,
+                Evaluation.job_id == job_id,
+                Evaluation.resume_version == CandidateProfile.resume_version,
+            ),
+        )
+        .join(UserPreference, UserPreference.user_id == User.id, isouter=True)
+        .join(delivered, delivered.c.user_id == User.id, isouter=True)
+        .where(User.status == "active")
+        .order_by(Evaluation.fit_score.desc(), User.display_name)
+    ).all()
+    return [
+        {
+            "user": user,
+            "preference": preference,
+            "evaluation": evaluation,
+            "recipient": (
+                preference.notification_email
+                if preference and preference.notification_email
+                else user.email
+            ),
+            "previously_notified": notified_user_id is not None,
+            "recommended": evaluation.recommendation.casefold() == "apply",
+        }
+        for user, preference, evaluation, notified_user_id in rows
+    ]
+
+
+def send_administrator_job_notifications(
+    session,
+    job: Job,
+    candidates: list[dict],
+    selected_user_ids: set[str],
+    allow_resend: bool = False,
+    sender=email_notify,
+) -> dict[str, int]:
+    """Send reviewed job alerts and persist every delivery attempt."""
+    counts = {"sent": 0, "failed": 0, "skipped": 0}
+    job_payload = {
+        "title": job.title,
+        "company": job.company,
+        "location": job.location,
+        "freshness_status": job.freshness_status,
+        "apply_url": job.apply_url,
+    }
+    now = datetime.now(timezone.utc)
+    for candidate in candidates:
+        user = candidate["user"]
+        if user.id not in selected_user_ids:
+            continue
+        if candidate["previously_notified"] and not allow_resend:
+            counts["skipped"] += 1
+            continue
+        evaluation = candidate["evaluation"]
+        evaluation_payload = {
+            "fit_score": evaluation.fit_score,
+            "classification": evaluation.classification,
+            "recommendation": evaluation.recommendation,
+            "selected_resume": evaluation.selected_resume,
+            "reasoning": evaluation.reasoning,
+            "missing_requirements": evaluation.missing_requirements or [],
+        }
+        sent, detail = sender(
+            job_payload,
+            evaluation_payload,
+            "administrator selected job alert",
+            recipient=candidate["recipient"],
+        )
+        session.add(Notification(
+            user_id=user.id,
+            job_id=job.id,
+            evaluation_id=evaluation.id,
+            channel="email" if sent else "console",
+            sent_at=now,
+            status="sent" if sent else "not_sent",
+            detail=f"Administrator initiated: {detail}",
+        ))
+        counts["sent" if sent else "failed"] += 1
+    session.commit()
+    return counts
 
 app = FastAPI(title="Calaveras Job Agent")
 
@@ -904,6 +1033,65 @@ def jobs_page(
             "administrator_view": False,
         }
     )
+
+
+@app.get("/admin/jobs/{job_id}/notify", response_class=HTMLResponse)
+def administrator_job_notification_page(job_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        job = session.get(Job, job_id)
+        if not job:
+            return HTMLResponse("Job not found", status_code=404)
+        candidates = administrator_notification_candidates(session, job_id)
+    return templates.TemplateResponse(
+        request,
+        "job_notify.html",
+        {"job": job, "candidates": candidates},
+    )
+
+
+@app.post("/admin/jobs/{job_id}/notify")
+def send_administrator_job_notification(
+    job_id: str,
+    request: Request,
+    user_ids: list[str] = Form([]),
+    allow_resend: str | None = Form(None),
+):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    if not user_ids:
+        return RedirectResponse(
+            f"/admin/jobs/{job_id}/notify?message=Select+at+least+one+user",
+            status_code=303,
+        )
+    with SessionLocal() as session:
+        job = session.get(Job, job_id)
+        if not job:
+            return HTMLResponse("Job not found", status_code=404)
+        candidates = administrator_notification_candidates(session, job_id)
+        counts = send_administrator_job_notifications(
+            session,
+            job,
+            candidates,
+            set(user_ids),
+            allow_resend=allow_resend == "on",
+        )
+        record_audit(
+            session,
+            "administrator_job_notification",
+            actor_user_id=current_user_id(request),
+            request=request,
+            detail={"job_id": job_id, **counts},
+        )
+    message = (
+        f"Sent+{counts['sent']}"
+        f";+failed+{counts['failed']}"
+        f";+skipped+{counts['skipped']}"
+    )
+    return RedirectResponse(f"/jobs?message={message}", status_code=303)
 
 @app.post("/jobs/{job_id}/status")
 def set_job_status(job_id: str, request: Request, status: str = Form(...)):
