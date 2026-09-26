@@ -150,6 +150,7 @@ class ResumeAsset(Base):
     resume_type: Mapped[str] = mapped_column(String(50), nullable=False)  # focused | all-work-experience
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_uri: Mapped[str] = mapped_column(Text, nullable=False)
+    extracted_text: Mapped[str | None] = mapped_column(Text)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
 
