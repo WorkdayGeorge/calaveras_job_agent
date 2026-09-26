@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -33,8 +32,11 @@ from job_agent.user_data import assign_legacy_records_to_admin, get_or_create_jo
 from job_agent.profile_store import (
     ensure_user_profile_records,
     seed_admin_profile,
+    search_term_alignment,
+    structured_candidate_profile,
     validate_candidate_profile,
 )
+from job_agent.profile_extractor import propose_profile_from_resume
 from job_agent.analytics import build_admin_analytics, resolve_date_range
 from job_agent.preflight import production_readiness
 from job_agent.backfill import backfill_progress, request_backfill
@@ -48,7 +50,7 @@ from job_agent.user_search import (
 
 
 from .cloud_trigger import trigger_worker
-from .resume_storage import save_resume
+from .resume_storage import extract_resume_text, read_resume, save_resume
 from .auth import (
     bootstrap_admin,
     consume_token,
@@ -1595,15 +1597,17 @@ def user_profile_page(user_id: str, request: Request):
             return HTMLResponse("User not found", status_code=404)
         profile, preference = ensure_user_profile_records(session, user)
         user_terms = ensure_user_search_terms(session, user)
-        profile_json = json.dumps(profile.profile_data, indent=2, ensure_ascii=False)
         progress = backfill_progress(session, user.id, profile.resume_version)
     return templates.TemplateResponse(request, "user_profile.html", {
         "user": user,
         "profile": profile,
         "preference": preference,
-        "profile_json": profile_json,
+        "profile_data": profile.profile_data,
+        "saved_profile_data": None,
+        "suggestion_asset": None,
         "backfill": progress,
         "user_terms": user_terms,
+        "alignment": search_term_alignment(profile.profile_data, user_terms),
         "error": None,
     })
 
@@ -1612,7 +1616,24 @@ def user_profile_page(user_id: str, request: Request):
 def save_user_profile(
     user_id: str,
     request: Request,
-    profile_json: str = Form(...),
+    candidate_name: str = Form(...),
+    location: str = Form(...),
+    career_targets: str = Form(""),
+    accounting_office: str = Form(""),
+    data_technical: str = Form(""),
+    operations: str = Form(""),
+    transferable: str = Form(""),
+    experience_role: list[str] = Form([]),
+    experience_company: list[str] = Form([]),
+    experience_location: list[str] = Form([]),
+    experience_dates: list[str] = Form([]),
+    experience_highlights: list[str] = Form([]),
+    education_name: list[str] = Form([]),
+    education_provider: list[str] = Form([]),
+    education_status: list[str] = Form([]),
+    focused_rules: str = Form(""),
+    all_work_rules: str = Form(""),
+    truth_constraints: str = Form(""),
     notification_email: str = Form(...),
     digest_time: str = Form("17:05"),
     is_active: str | None = Form(None),
@@ -1622,13 +1643,27 @@ def save_user_profile(
     denial = require_admin(request)
     if denial:
         return denial
-    try:
-        profile_data = json.loads(profile_json)
-    except json.JSONDecodeError as exc:
-        profile_data = None
-        errors = [f"Profile JSON is invalid near line {exc.lineno}: {exc.msg}"]
-    else:
-        errors = validate_candidate_profile(profile_data)
+    profile_data = structured_candidate_profile(
+        name=candidate_name,
+        location=location,
+        career_targets=career_targets,
+        accounting_office=accounting_office,
+        data_technical=data_technical,
+        operations=operations,
+        transferable=transferable,
+        experience_roles=experience_role,
+        experience_companies=experience_company,
+        experience_locations=experience_location,
+        experience_dates=experience_dates,
+        experience_highlights=experience_highlights,
+        education_names=education_name,
+        education_providers=education_provider,
+        education_statuses=education_status,
+        focused_rules=focused_rules,
+        all_work_rules=all_work_rules,
+        truth_constraints=truth_constraints,
+    )
+    errors = validate_candidate_profile(profile_data)
     recipient = normalize_email_address(notification_email)
     if not recipient:
         errors.append("Notification email must be a valid single email address.")
@@ -1649,9 +1684,12 @@ def save_user_profile(
                 "user": user,
                 "profile": profile,
                 "preference": preference,
-                "profile_json": profile_json,
+                "profile_data": profile_data,
+                "saved_profile_data": None,
+                "suggestion_asset": None,
                 "backfill": progress,
                 "user_terms": user_terms,
+                "alignment": search_term_alignment(profile_data, user_terms),
                 "error": " ".join(errors),
             }, status_code=400)
 
@@ -1836,6 +1874,66 @@ def resumes_page(request: Request, user_id: str | None = None):
         {"assets": assets, "users": users, "selected_user_id": selected_user_id}
     )
 
+
+@app.post("/resumes/{asset_id}/profile-suggestion", response_class=HTMLResponse)
+def resume_profile_suggestion(asset_id: str, request: Request):
+    denial = require_admin(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        asset = session.get(ResumeAsset, asset_id)
+        if not asset or not asset.user_id:
+            return HTMLResponse("Resume not found", status_code=404)
+        user = session.get(User, asset.user_id)
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        profile, preference = ensure_user_profile_records(session, user)
+        user_terms = ensure_user_search_terms(session, user)
+        progress = backfill_progress(session, user.id, profile.resume_version)
+        enabled_terms = [term.term for term in user_terms if term.enabled]
+        error = None
+        proposal = profile.profile_data
+        try:
+            resume_text = asset.extracted_text
+            if not resume_text:
+                resume_content = read_resume(asset.storage_uri)
+                resume_text = extract_resume_text(asset.filename, resume_content)
+                asset.extracted_text = resume_text
+                session.commit()
+            proposal = propose_profile_from_resume(
+                resume_text,
+                profile.profile_data,
+                enabled_terms,
+            )
+        except Exception as exc:
+            error = f"Resume review could not be prepared: {exc}"
+        if not error:
+            record_audit(
+                session,
+                "resume_profile_suggestion_generated",
+                actor_user_id=current_user_id(request),
+                target_user_id=user.id,
+                request=request,
+                detail={"resume_asset_id": asset.id, "filename": asset.filename},
+            )
+    return templates.TemplateResponse(
+        request,
+        "user_profile.html",
+        {
+            "user": user,
+            "profile": profile,
+            "preference": preference,
+            "profile_data": proposal,
+            "saved_profile_data": profile.profile_data if not error else None,
+            "suggestion_asset": asset if not error else None,
+            "backfill": progress,
+            "user_terms": user_terms,
+            "alignment": search_term_alignment(proposal, user_terms),
+            "error": error,
+        },
+        status_code=502 if error else 200,
+    )
+
 @app.post("/resumes/upload")
 async def upload_resume(
     request: Request,
@@ -1856,6 +1954,10 @@ async def upload_resume(
     content = await resume.read()
     if len(content) > 10 * 1024 * 1024:
         return JSONResponse({"error": "resume exceeds 10 MB"}, status_code=400)
+    try:
+        extracted_text = extract_resume_text(filename, content)
+    except Exception:
+        extracted_text = None
 
     with SessionLocal() as session:
         target_user_id = user_id or current_user_id(request)
@@ -1876,8 +1978,12 @@ async def upload_resume(
             resume_type=resume_type,
             filename=filename,
             storage_uri=uri,
+            extracted_text=extracted_text,
             uploaded_at=datetime.now(timezone.utc),
             is_current=True,
         ))
         session.commit()
-    return RedirectResponse(f"/resumes?user_id={target_user_id}", status_code=303)
+    return RedirectResponse(
+        f"/resumes?user_id={target_user_id}&message=Resume+uploaded;+review+the+suggested+profile+before+saving",
+        status_code=303,
+    )
