@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+import re
 
 from sqlalchemy import select
 
@@ -12,6 +13,13 @@ from .notify import normalize_email_address
 
 PROFILE_LIST_FIELDS = ("career_targets", "experience", "education_training", "truth_constraints")
 PROFILE_SKILL_FIELDS = ("accounting_office", "data_technical", "operations", "transferable")
+
+
+def profile_identity_matches(profile_name: str | None, account_name: str) -> bool:
+    """Return whether the profile and account identify the same first name."""
+    profile_tokens = re.findall(r"[a-z]+", str(profile_name or "").casefold())
+    account_tokens = re.findall(r"[a-z]+", str(account_name or "").casefold())
+    return bool(profile_tokens and account_tokens and profile_tokens[0] == account_tokens[0])
 
 
 def split_profile_lines(value: str | None) -> list[str]:
