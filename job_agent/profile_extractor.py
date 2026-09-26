@@ -18,6 +18,11 @@ Never infer a certification, software skill, license, or job duty that is not
 explicitly supported. Preserve and strengthen truth_constraints. Coursework is
 training, not employment. Keep list items concise and remove duplicates. The
 profile name must be candidate_name; do not retain another candidate's name.
+Populate career_targets with the enabled search terms. Extract every competency
+explicitly supported by resume duties or skill sections into exactly one of the
+four skills categories: accounting_office, data_technical, operations, or
+transferable. Do not leave all four skill categories empty when the resume
+contains supported competencies.
 """
 
 
@@ -42,14 +47,61 @@ def _items(value) -> list[str]:
     return []
 
 
+def _unique(values: list[str]) -> list[str]:
+    seen = set()
+    result = []
+    for value in values:
+        cleaned = _text(value)
+        key = cleaned.casefold()
+        if cleaned and key not in seen:
+            seen.add(key)
+            result.append(cleaned)
+    return result
+
+
+SKILL_ALIASES = {
+    "accounting_office": (
+        "accounting_office", "accounting", "office", "office_skills",
+        "administrative", "administrative_skills",
+    ),
+    "data_technical": (
+        "data_technical", "technical", "technical_skills", "technology",
+        "computer", "computer_skills", "data", "data_skills",
+    ),
+    "operations": (
+        "operations", "operational", "operational_skills", "warehouse",
+        "logistics",
+    ),
+    "transferable": (
+        "transferable", "transferable_skills", "soft_skills",
+        "customer_service", "interpersonal",
+    ),
+}
+
+
 def normalize_profile_proposal(
     proposal: dict,
     current_profile: dict,
     candidate_name: str | None = None,
+    search_terms: list[str] | None = None,
 ) -> dict:
     """Normalize common resume-extraction shapes into the profile schema."""
-    skills = proposal.get("skills") if isinstance(proposal.get("skills"), dict) else {}
+    raw_skills = proposal.get("skills")
+    skills = raw_skills if isinstance(raw_skills, dict) else {}
     current_skills = current_profile.get("skills", {})
+    normalized_skills = {}
+    for category, aliases in SKILL_ALIASES.items():
+        values = []
+        for alias in aliases:
+            values.extend(_items(skills.get(alias)))
+            values.extend(_items(proposal.get(alias)))
+        if not values:
+            values = _items(current_skills.get(category, []))
+        normalized_skills[category] = _unique(values)
+    if isinstance(raw_skills, list):
+        normalized_skills["transferable"] = _unique(
+            normalized_skills["transferable"] + _items(raw_skills)
+        )
     experience_source = proposal.get("experience")
     if experience_source is None:
         experience_source = proposal.get(
@@ -115,18 +167,17 @@ def normalize_profile_proposal(
     rules = proposal.get("resume_selection_rules")
     if not isinstance(rules, dict):
         rules = current_profile.get("resume_selection_rules", {})
+    career_targets = _items(
+        proposal.get("career_targets", current_profile.get("career_targets", []))
+    )
+    career_targets = _unique(career_targets + list(search_terms or []))
     return {
         "name": candidate_name or _text(proposal.get("name"))
         or _text(current_profile.get("name")),
         "location": _text(proposal.get("location"))
         or _text(current_profile.get("location")),
-        "career_targets": _items(
-            proposal.get("career_targets", current_profile.get("career_targets", []))
-        ),
-        "skills": {
-            key: _items(skills.get(key, current_skills.get(key, [])))
-            for key in ("accounting_office", "data_technical", "operations", "transferable")
-        },
+        "career_targets": career_targets,
+        "skills": normalized_skills,
         "experience": experience,
         "education_training": education,
         "resume_selection_rules": {
@@ -175,6 +226,7 @@ def propose_profile_from_resume(
         proposal,
         current_profile,
         candidate_name=candidate_name,
+        search_terms=search_terms,
     )
     errors = validate_candidate_profile(proposal)
     if errors:
