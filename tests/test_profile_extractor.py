@@ -53,11 +53,18 @@ def test_common_resume_shapes_are_normalized_before_validation():
         "High school diploma",
         {"program": "Customer Service Training", "institution": "Example School"},
     ]
+    proposal["career_targets"] = []
+    proposal["skills"] = {
+        "office_skills": ["Microsoft Office"],
+        "technical_skills": ["Computer troubleshooting"],
+        "customer_service": ["Guest service"],
+    }
 
     result = normalize_profile_proposal(
         proposal,
         valid_profile(),
         candidate_name="Monte O. George IV",
+        search_terms=["Hotel Front Desk"],
     )
 
     assert result["experience"][0] == {
@@ -71,3 +78,7 @@ def test_common_resume_shapes_are_normalized_before_validation():
         "name": "High school diploma", "provider": "", "status": "",
     }
     assert result["education_training"][1]["provider"] == "Example School"
+    assert result["career_targets"] == ["Hotel Front Desk"]
+    assert result["skills"]["accounting_office"] == ["Microsoft Office"]
+    assert result["skills"]["data_technical"] == ["Computer troubleshooting"]
+    assert result["skills"]["transferable"] == ["Guest service"]
