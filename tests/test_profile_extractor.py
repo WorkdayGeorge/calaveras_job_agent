@@ -23,9 +23,11 @@ def test_resume_profile_proposal_accepts_reviewable_json(monkeypatch):
         "Customer service experience",
         valid_profile(),
         ["hotel front desk"],
+        candidate_name="Monte O. George IV",
     )
 
     assert result["career_targets"] == ["hotel front desk"]
+    assert result["name"] == "Monte O. George IV"
 
 
 def test_resume_profile_proposal_requires_readable_text():
