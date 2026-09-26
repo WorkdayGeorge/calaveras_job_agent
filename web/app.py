@@ -1607,6 +1607,7 @@ def user_profile_page(user_id: str, request: Request):
         "profile_data": profile.profile_data,
         "saved_profile_data": None,
         "suggestion_asset": None,
+        "review_mode": False,
         "backfill": progress,
         "user_terms": user_terms,
         "alignment": search_term_alignment(profile.profile_data, user_terms),
@@ -1641,6 +1642,8 @@ def save_user_profile(
     is_active: str | None = Form(None),
     immediate_alerts: str | None = Form(None),
     daily_digest: str | None = Form(None),
+    profile_review: str | None = Form(None),
+    queue_backfill_after_save: str | None = Form(None),
 ):
     denial = require_admin(request)
     if denial:
@@ -1689,6 +1692,7 @@ def save_user_profile(
                 "profile_data": profile_data,
                 "saved_profile_data": None,
                 "suggestion_asset": None,
+                "review_mode": profile_review == "on",
                 "backfill": progress,
                 "user_terms": user_terms,
                 "alignment": search_term_alignment(profile_data, user_terms),
@@ -1715,8 +1719,33 @@ def save_user_profile(
             request=request,
             detail={"active": profile.is_active, "version": profile.version},
         )
+        queued = False
+        if queue_backfill_after_save == "on" and profile.is_active:
+            backfill = request_backfill(session, user.id)
+            queued = True
+            record_audit(
+                session,
+                "evaluation_backfill_requested",
+                actor_user_id=current_user_id(request),
+                target_user_id=user.id,
+                request=request,
+                detail={
+                    "resume_version": profile.resume_version,
+                    "pending": max(
+                        0,
+                        backfill.total_jobs - backfill.completed_jobs,
+                    ),
+                    "notifications": False,
+                    "requested_with_profile_save": True,
+                },
+            )
+    message = (
+        "Profile+saved+and+score+backfill+queued"
+        if queued
+        else "Profile+saved"
+    )
     return RedirectResponse(
-        f"/admin/users/{user_id}/profile?message=Profile+saved",
+        f"/admin/users/{user_id}/profile?message={message}",
         status_code=303,
     )
 
@@ -1941,6 +1970,7 @@ def resume_profile_suggestion(asset_id: str, request: Request):
             "saved_profile_data": profile.profile_data if not error else None,
             "suggestion_asset": asset if not error else None,
             "identity_warning": identity_warning,
+            "review_mode": not error,
             "backfill": progress,
             "user_terms": user_terms,
             "alignment": search_term_alignment(proposal, user_terms),
