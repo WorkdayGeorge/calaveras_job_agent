@@ -33,6 +33,15 @@ def init_db() -> None:
                 "ADD COLUMN candidate_profile_version VARCHAR(100)"
             ))
 
+        resume_columns = {
+            column["name"]
+            for column in inspector.get_columns("resume_assets")
+        }
+        if "extracted_text" not in resume_columns:
+            connection.execute(text(
+                "ALTER TABLE resume_assets ADD COLUMN extracted_text TEXT"
+            ))
+
     if engine.dialect.name == "postgresql":
         columns = {
             column["name"]: column
