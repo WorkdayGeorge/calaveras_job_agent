@@ -30,7 +30,9 @@ from job_agent.settings_store import (
 )
 from job_agent.user_data import assign_legacy_records_to_admin, get_or_create_job_state
 from job_agent.profile_store import (
+    empty_candidate_profile,
     ensure_user_profile_records,
+    profile_identity_matches,
     seed_admin_profile,
     search_term_alignment,
     structured_candidate_profile,
@@ -1892,6 +1894,7 @@ def resume_profile_suggestion(asset_id: str, request: Request):
         progress = backfill_progress(session, user.id, profile.resume_version)
         enabled_terms = [term.term for term in user_terms if term.enabled]
         error = None
+        identity_warning = None
         proposal = profile.profile_data
         try:
             resume_text = asset.extracted_text
@@ -1900,10 +1903,21 @@ def resume_profile_suggestion(asset_id: str, request: Request):
                 resume_text = extract_resume_text(asset.filename, resume_content)
                 asset.extracted_text = resume_text
                 session.commit()
+            merge_profile = profile.profile_data
+            if not profile_identity_matches(
+                profile.profile_data.get("name"),
+                user.display_name,
+            ):
+                merge_profile = empty_candidate_profile(user)
+                identity_warning = (
+                    "The saved profile belonged to a different candidate and "
+                    "was not used as the basis for this suggestion."
+                )
             proposal = propose_profile_from_resume(
                 resume_text,
-                profile.profile_data,
+                merge_profile,
                 enabled_terms,
+                candidate_name=user.display_name,
             )
         except Exception as exc:
             error = f"Resume review could not be prepared: {exc}"
@@ -1926,6 +1940,7 @@ def resume_profile_suggestion(asset_id: str, request: Request):
             "profile_data": proposal,
             "saved_profile_data": profile.profile_data if not error else None,
             "suggestion_asset": asset if not error else None,
+            "identity_warning": identity_warning,
             "backfill": progress,
             "user_terms": user_terms,
             "alignment": search_term_alignment(proposal, user_terms),
