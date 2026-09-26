@@ -10,9 +10,12 @@ from job_agent.pipeline import process_high_priority_digest
 from job_agent.profile_store import (
     active_evaluation_targets,
     ensure_user_profile_records,
+    search_term_alignment,
     seed_admin_profile,
+    structured_candidate_profile,
     validate_candidate_profile,
 )
+from types import SimpleNamespace
 from web.auth import hash_password
 
 
@@ -112,6 +115,54 @@ def test_profile_validation_rejects_missing_truth_structure():
     profile["skills"].pop("accounting_office")
     errors = validate_candidate_profile(profile)
     assert "skills.accounting_office must be a list." in errors
+
+
+def test_structured_profile_form_builds_safe_profile_lists():
+    profile = structured_candidate_profile(
+        name="Example Person",
+        location="Arnold, CA",
+        career_targets="Hotel front desk\nAdministrative assistant\n",
+        accounting_office="Data entry\nMicrosoft Excel",
+        data_technical="Windows support",
+        operations="Inventory",
+        transferable="Customer service\nTeamwork",
+        experience_roles=["Front Desk Clerk", ""],
+        experience_companies=["Example Hotel", ""],
+        experience_locations=["Murphys, CA", ""],
+        experience_dates=["2024-2025", ""],
+        experience_highlights=["Helped guests\nAnswered phones", ""],
+        education_names=["Hospitality coursework", ""],
+        education_providers=["Example College", ""],
+        education_statuses=["Completed", ""],
+        focused_rules="administrative\nfront desk",
+        all_work_rules="operations",
+        truth_constraints="Do not invent certifications.",
+    )
+
+    assert validate_candidate_profile(profile) == []
+    assert profile["career_targets"] == ["Hotel front desk", "Administrative assistant"]
+    assert profile["experience"] == [{
+        "role": "Front Desk Clerk",
+        "company": "Example Hotel",
+        "location": "Murphys, CA",
+        "dates": "2024-2025",
+        "highlights": ["Helped guests", "Answered phones"],
+    }]
+    assert len(profile["education_training"]) == 1
+
+
+def test_search_term_alignment_compares_enabled_terms_to_career_targets():
+    profile = valid_profile()
+    terms = [
+        SimpleNamespace(term="Accounting Clerk", enabled=True),
+        SimpleNamespace(term="Hotel Front Desk", enabled=True),
+        SimpleNamespace(term="Warehouse", enabled=False),
+    ]
+
+    assert search_term_alignment(profile, terms) == [
+        {"term": "Accounting Clerk", "aligned": True},
+        {"term": "Hotel Front Desk", "aligned": False},
+    ]
 
 
 def test_daily_digests_are_separated_by_user(monkeypatch):
