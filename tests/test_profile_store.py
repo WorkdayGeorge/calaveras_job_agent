@@ -10,6 +10,7 @@ from job_agent.pipeline import process_high_priority_digest
 from job_agent.profile_store import (
     active_evaluation_targets,
     ensure_user_profile_records,
+    profile_identity_matches,
     search_term_alignment,
     seed_admin_profile,
     structured_candidate_profile,
@@ -163,6 +164,11 @@ def test_search_term_alignment_compares_enabled_terms_to_career_targets():
         {"term": "Accounting Clerk", "aligned": True},
         {"term": "Hotel Front Desk", "aligned": False},
     ]
+
+
+def test_profile_identity_guard_detects_another_candidate():
+    assert profile_identity_matches("Monte George", "Monte O. George IV") is True
+    assert profile_identity_matches("Joshua George", "Monte O. George IV") is False
 
 
 def test_daily_digests_are_separated_by_user(monkeypatch):
