@@ -96,9 +96,11 @@ resume is being managed. Application Tracking records status, applied date,
 follow-up date, interview date, outcome, URL, and private notes.
 
 Each user has a versioned JSON candidate profile under **Users → Profile &
-alerts**. New profiles are inactive by default and are never populated by an
-automatic resume rewrite. The administrator must review the facts and truth
-constraints before activating evaluation. The worker evaluates each active
+alerts**. JSON remains the internal storage format, while administrators edit
+ordinary profile fields, one-item-per-line skill lists, experience cards, and
+education/training rows. New profiles are inactive by default and are never
+populated by an automatic resume rewrite. The administrator must review the
+facts and truth constraints before activating evaluation. The worker evaluates each active
 profile independently, stores only that user's result, and uses that user's
 email and immediate/digest preferences. Updating profile facts creates a new
 profile version, so older scores and application packages are not presented as
@@ -171,6 +173,14 @@ preselected; successful prior deliveries are protected from duplicates unless
 the administrator explicitly enables a resend. Attempts are recorded in
 Notifications, included in the per-job notified count, and summarized in the
 Audit Log.
+
+Current uploaded DOCX and PDF resumes provide a **Review & Update Profile**
+action. Resume text is extracted at upload time, combined with the saved profile
+and enabled search terms to prepare a proposed structured profile, and shown for
+administrator review. Search terms may influence career targets only; they are
+never treated as evidence of skills or experience. Nothing is saved until the
+administrator approves the visible fields. Saving changes creates a new profile
+version and makes the existing score-backfill control available for rescoring.
 
 ## Worker only
 
