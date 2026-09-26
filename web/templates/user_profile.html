@@ -12,6 +12,7 @@
   <h2 style="margin-top:0">Resume suggestion ready</h2>
   <p><strong>{{ suggestion_asset.filename }}</strong> was reviewed. The saved profile has not changed.</p>
   <p class="muted">Review and edit every suggested field below, then select Save. Search terms can guide career targets but are never treated as proof of skills or experience.</p>
+  {% if identity_warning %}<p class="warn">{{ identity_warning }}</p>{% endif %}
   <div class="grid">
     <div><strong>Saved career targets</strong><ul>{% for item in saved_profile_data.career_targets %}<li>{{ item }}</li>{% else %}<li class="muted">None</li>{% endfor %}</ul></div>
     <div><strong>Suggested career targets</strong><ul>{% for item in profile_data.career_targets %}<li>{{ item }}</li>{% else %}<li class="muted">None</li>{% endfor %}</ul></div>
