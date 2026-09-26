@@ -14,6 +14,106 @@ PROFILE_LIST_FIELDS = ("career_targets", "experience", "education_training", "tr
 PROFILE_SKILL_FIELDS = ("accounting_office", "data_technical", "operations", "transferable")
 
 
+def split_profile_lines(value: str | None) -> list[str]:
+    """Convert an administrator-friendly one-item-per-line field to a list."""
+    return [line.strip() for line in str(value or "").splitlines() if line.strip()]
+
+
+def structured_candidate_profile(
+    *,
+    name: str,
+    location: str,
+    career_targets: str,
+    accounting_office: str,
+    data_technical: str,
+    operations: str,
+    transferable: str,
+    experience_roles: list[str],
+    experience_companies: list[str],
+    experience_locations: list[str],
+    experience_dates: list[str],
+    experience_highlights: list[str],
+    education_names: list[str],
+    education_providers: list[str],
+    education_statuses: list[str],
+    focused_rules: str,
+    all_work_rules: str,
+    truth_constraints: str,
+) -> dict:
+    """Build the stored profile safely from structured form fields."""
+    experience = []
+    for values in zip(
+        experience_roles,
+        experience_companies,
+        experience_locations,
+        experience_dates,
+        experience_highlights,
+    ):
+        role, company, item_location, dates, highlights = (
+            str(value or "").strip() for value in values
+        )
+        if not any((role, company, item_location, dates, highlights)):
+            continue
+        experience.append({
+            "role": role,
+            "company": company,
+            "location": item_location,
+            "dates": dates,
+            "highlights": split_profile_lines(highlights),
+        })
+
+    education_training = []
+    for values in zip(education_names, education_providers, education_statuses):
+        item_name, provider, status = (
+            str(value or "").strip() for value in values
+        )
+        if not any((item_name, provider, status)):
+            continue
+        education_training.append({
+            "name": item_name,
+            "provider": provider,
+            "status": status,
+        })
+
+    return {
+        "name": name.strip(),
+        "location": location.strip(),
+        "career_targets": split_profile_lines(career_targets),
+        "skills": {
+            "accounting_office": split_profile_lines(accounting_office),
+            "data_technical": split_profile_lines(data_technical),
+            "operations": split_profile_lines(operations),
+            "transferable": split_profile_lines(transferable),
+        },
+        "experience": experience,
+        "education_training": education_training,
+        "resume_selection_rules": {
+            "focused": split_profile_lines(focused_rules),
+            "all_work_experience": split_profile_lines(all_work_rules),
+        },
+        "truth_constraints": split_profile_lines(truth_constraints),
+    }
+
+
+def search_term_alignment(profile: dict, terms) -> list[dict]:
+    """Compare enabled search phrases with explicit candidate career targets."""
+    targets = [str(value).casefold() for value in profile.get("career_targets", [])]
+    rows = []
+    for term in terms:
+        if not getattr(term, "enabled", False):
+            continue
+        phrase = str(term.term).strip()
+        words = {word for word in phrase.casefold().split() if len(word) >= 3}
+        aligned = any(
+            phrase.casefold() in target
+            or target in phrase.casefold()
+            or bool(words & set(target.split()))
+            for target in targets
+        )
+        rows.append({"term": phrase, "aligned": aligned})
+    return rows
+
+
 def empty_candidate_profile(user: User) -> dict:
     return {
         "name": user.display_name,
@@ -43,6 +143,24 @@ def validate_candidate_profile(profile: dict) -> list[str]:
     for key in PROFILE_LIST_FIELDS:
         if not isinstance(profile.get(key), list):
             errors.append(f"{key} must be a list.")
+    for index, item in enumerate(profile.get("experience", [])):
+        if not isinstance(item, dict):
+            errors.append(f"experience[{index}] must be an object.")
+            continue
+        for key in ("role", "company", "location", "dates"):
+            if not isinstance(item.get(key), str):
+                errors.append(f"experience[{index}].{key} must be text.")
+        if not isinstance(item.get("highlights"), list):
+            errors.append(f"experience[{index}].highlights must be a list.")
+    for index, item in enumerate(profile.get("education_training", [])):
+        if not isinstance(item, dict):
+            errors.append(f"education_training[{index}] must be an object.")
+            continue
+        for key in ("name", "provider", "status"):
+            if not isinstance(item.get(key), str):
+                errors.append(
+                    f"education_training[{index}].{key} must be text."
+                )
     skills = profile.get("skills")
     if not isinstance(skills, dict):
         errors.append("skills must be an object.")
