@@ -28,7 +28,7 @@
   {% for item in alignment %}<span class="pill" style="margin:3px;{% if item.aligned %}background:#dcfce7{% else %}background:#fef3c7{% endif %}">{{ item.term }} — {{ 'Aligned' if item.aligned else 'Review target' }}</span>{% else %}<span class="muted">No enabled search terms.</span>{% endfor %}
 </div>
 
-<form method="post">
+<form method="post" action="/admin/users/{{ user.id }}/profile">
 {% if suggestion_asset or review_mode %}<input type="hidden" name="profile_review" value="on">{% endif %}
 <div class="card">
   <h2 style="margin-top:0">Profile status</h2>
