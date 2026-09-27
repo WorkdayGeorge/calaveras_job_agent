@@ -69,8 +69,8 @@
 
 <div class="card" style="margin-top:18px">
   <h2 style="margin-top:0">Education and training</h2>
-  {% for item in profile_data.education_training %}<div class="row"><div><label>Program or training</label><input name="education_name" value="{{ item.name }}"></div><div><label>Provider</label><input name="education_provider" value="{{ item.provider }}"></div><div><label>Status</label><input name="education_status" value="{{ item.status }}"></div></div>{% endfor %}
-  {% for _ in range(2) %}<div class="row"><div><label>New program or training</label><input name="education_name"></div><div><label>Provider</label><input name="education_provider"></div><div><label>Status</label><input name="education_status"></div></div>{% endfor %}
+  {% for item in profile_data.education_training %}<div class="row"><div><label>Program or training</label><input name="education_name" value="{{ item.name }}"></div><div><label>Provider</label><input name="education_provider" value="{{ item.provider }}"></div><div><label>Details, dates, and status</label><textarea name="education_status" rows="3">{{ item.status }}</textarea></div></div>{% endfor %}
+  {% for _ in range(2) %}<div class="row"><div><label>New program or training</label><input name="education_name"></div><div><label>Provider</label><input name="education_provider"></div><div><label>Details, dates, and status</label><textarea name="education_status" rows="3"></textarea></div></div>{% endfor %}
 </div>
 
 <div class="card" style="margin-top:18px"><h2 style="margin-top:0">Resume selection</h2><div class="row"><div><label>Use focused resume for</label><textarea name="focused_rules" rows="7">{{ profile_data.resume_selection_rules.focused|join('\n') }}</textarea></div><div><label>Use all-work-experience resume for</label><textarea name="all_work_rules" rows="7">{{ profile_data.resume_selection_rules.all_work_experience|join('\n') }}</textarea></div></div></div>
