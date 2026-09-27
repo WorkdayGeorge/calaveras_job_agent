@@ -107,3 +107,50 @@ def test_common_resume_shapes_are_normalized_before_validation():
     assert result["skills"]["accounting_office"] == ["Microsoft Office"]
     assert result["skills"]["data_technical"] == ["Computer troubleshooting"]
     assert result["skills"]["transferable"] == ["Guest service"]
+
+
+def test_linkedin_details_are_preserved_in_highlights_and_education():
+    proposal = valid_profile()
+    proposal["experience"] = [{
+        "title": "Workday Integration Consultant",
+        "company": "Example Consulting",
+        "start_date": "January 2020",
+        "end_date": "June 2025",
+        "description": "Built Workday integrations\nSupported production releases",
+        "projects": ["Automated reconciliation reporting"],
+    }]
+    proposal["education_training"] = [{
+        "school": "Example College",
+        "degree_name": "Certificate",
+        "field_of_study": "Accounting and Bookkeeping",
+        "dates": "2024-2025",
+        "activities_and_societies": "Accounting Club",
+        "description": "Completed coursework; final certification not awarded.",
+    }]
+    proposal["certifications"] = [{
+        "name": "Excel Essential Training",
+        "issuer": "LinkedIn Learning",
+        "date": "2025",
+    }]
+
+    result = normalize_profile_proposal(proposal, valid_profile())
+
+    assert result["experience"][0]["dates"] == "January 2020 – June 2025"
+    assert result["experience"][0]["highlights"] == [
+        "Built Workday integrations",
+        "Supported production releases",
+        "Automated reconciliation reporting",
+    ]
+    assert result["education_training"][0] == {
+        "name": "Certificate — Accounting and Bookkeeping",
+        "provider": "Example College",
+        "status": (
+            "2024-2025 | Accounting Club | "
+            "Completed coursework; final certification not awarded."
+        ),
+    }
+    assert result["education_training"][1] == {
+        "name": "Excel Essential Training",
+        "provider": "LinkedIn Learning",
+        "status": "2025",
+    }
