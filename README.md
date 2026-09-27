@@ -293,3 +293,14 @@ Cloud Run Job <--- Cloud Scheduler (every 15 minutes)
 - Do not make the database public to the internet unless you have a specific
   reason and understand the network controls.
 - The agent does not auto-apply to jobs.
+
+# Application Assistant MVP
+
+The repository includes a Chrome Manifest V3 extension in `browser_extension/`.
+Signed-in users save reusable application answers at `/application-assistant`,
+create a revocable 90-day token, and connect the extension. The extension fills
+common contact, work-authorization, sponsorship, relocation, availability,
+salary, remote-preference, and resume-upload fields. It deliberately skips
+sensitive self-identification, legal-attestation, password, and submit controls.
+
+For MVP installation and use, see `browser_extension/README.md`.
