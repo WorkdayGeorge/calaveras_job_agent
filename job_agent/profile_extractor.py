@@ -10,8 +10,8 @@ PROFILE_EXTRACTION_INSTRUCTIONS = """
 You maintain a truthful candidate profile used to evaluate job fit.
 
 Return JSON only, using exactly the same object structure as current_profile.
-Merge facts supported by resume_text into current_profile. Preserve existing
-facts unless the resume clearly corrects them. Search terms describe desired
+Merge facts supported by source_text into current_profile. Preserve existing
+facts unless the source document clearly corrects them. Search terms describe desired
 work and may be used only to improve career_targets and resume-selection rules;
 they are not evidence of skills, work experience, education, or credentials.
 Never infer a certification, software skill, license, or job duty that is not
@@ -195,9 +195,10 @@ def propose_profile_from_resume(
     current_profile: dict,
     search_terms: list[str],
     candidate_name: str | None = None,
+    source_label: str = "resume",
 ) -> dict:
     if not resume_text.strip():
-        raise ValueError("No readable text was found in the resume.")
+        raise ValueError("No readable text was found in the source document.")
     api_key = env("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OpenAI profile extraction is not configured.")
@@ -208,7 +209,8 @@ def propose_profile_from_resume(
         "current_profile": current_profile,
         "candidate_name": candidate_name or current_profile.get("name", ""),
         "search_terms": search_terms,
-        "resume_text": resume_text[:50000],
+        "source_type": source_label,
+        "source_text": resume_text[:50000],
     }
     response = client.responses.create(
         model=env("OPENAI_MODEL", "gpt-5.6-luna"),
