@@ -3,7 +3,9 @@
 {% block content %}
 <h1>Resume &amp; Profile Sources</h1>
 {% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:16px">{{ request.query_params.get("message") }}</div>{% endif %}
+{% if request.session.get('role') == 'administrator' %}
 <form method="get" action="/resumes" class="card" style="margin-bottom:16px"><label>User</label><select name="user_id">{% for user in users %}<option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select><button class="btn secondary" style="margin-top:8px">View user</button></form>
+{% endif %}
 <div class="card">
 <p>Upload the current focused accounting/technical resume or the full work-history resume. In Google Cloud, configure <code>GCS_BUCKET</code> so uploads persist.</p>
 <form method="post" action="/resumes/upload" enctype="multipart/form-data">
