@@ -23,6 +23,15 @@ explicitly supported by resume duties or skill sections into exactly one of the
 four skills categories: accounting_office, data_technical, operations, or
 transferable. Do not leave all four skill categories empty when the resume
 contains supported competencies.
+
+For every work-history entry, preserve the full description as concise
+highlights. Do not return an experience entry with empty highlights when the
+source includes duties, accomplishments, projects, or a narrative description.
+For education and training, preserve the institution, degree or program, field
+of study, attendance or completion dates, completion status, grade, activities,
+and description when present. Include supported licenses, certifications, and
+courses in education_training. Do not reduce a detailed education entry to only
+the school name.
 """
 
 
@@ -57,6 +66,25 @@ def _unique(values: list[str]) -> list[str]:
             seen.add(key)
             result.append(cleaned)
     return result
+
+
+def _combined_items(item: dict, *keys: str) -> list[str]:
+    values = []
+    for key in keys:
+        values.extend(_items(item.get(key)))
+    return _unique(values)
+
+
+def _joined_details(item: dict, *keys: str) -> str:
+    return " | ".join(_combined_items(item, *keys))
+
+
+def _records(value) -> list:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return list(value)
+    return [value]
 
 
 SKILL_ALIASES = {
@@ -108,7 +136,7 @@ def normalize_profile_proposal(
             "work_experience", current_profile.get("experience", [])
         )
     experience = []
-    for item in experience_source or []:
+    for item in _records(experience_source):
         if isinstance(item, str):
             experience.append({
                 "role": item.strip(), "company": "", "location": "",
@@ -117,6 +145,17 @@ def normalize_profile_proposal(
             continue
         if not isinstance(item, dict):
             continue
+        dates = _text(
+            item.get("dates") or item.get("date_range")
+            or item.get("period") or item.get("date")
+        )
+        if not dates:
+            dates = " – ".join(
+                value for value in (
+                    _text(item.get("start_date") or item.get("start")),
+                    _text(item.get("end_date") or item.get("end")),
+                ) if value
+            )
         experience.append({
             "role": _text(
                 item.get("role") or item.get("title")
@@ -127,13 +166,11 @@ def normalize_profile_proposal(
                 or item.get("organization")
             ),
             "location": _text(item.get("location")),
-            "dates": _text(
-                item.get("dates") or item.get("date_range")
-                or item.get("period") or item.get("date")
-            ),
-            "highlights": _items(
-                item.get("highlights") or item.get("responsibilities")
-                or item.get("duties") or item.get("achievements")
+            "dates": dates,
+            "highlights": _combined_items(
+                item,
+                "highlights", "responsibilities", "duties", "achievements",
+                "accomplishments", "description", "summary", "projects",
             ),
         })
 
@@ -142,25 +179,40 @@ def normalize_profile_proposal(
         education_source = proposal.get(
             "education", current_profile.get("education_training", [])
         )
+    education_source = _records(education_source)
+    for key in ("training", "courses", "certifications", "licenses"):
+        education_source.extend(_records(proposal.get(key)))
     education = []
-    for item in education_source or []:
+    for item in education_source:
         if isinstance(item, str):
             education.append({"name": item.strip(), "provider": "", "status": ""})
             continue
         if not isinstance(item, dict):
             continue
+        name = _text(
+            item.get("name") or item.get("program") or item.get("course")
+            or item.get("degree") or item.get("degree_name")
+            or item.get("training") or item.get("certification")
+            or item.get("license")
+        )
+        field = _text(
+            item.get("field_of_study") or item.get("field")
+            or item.get("major") or item.get("specialization")
+        )
+        if field and field.casefold() not in name.casefold():
+            name = f"{name} — {field}" if name else field
         education.append({
-            "name": _text(
-                item.get("name") or item.get("program") or item.get("course")
-                or item.get("degree") or item.get("training")
-            ),
+            "name": name,
             "provider": _text(
                 item.get("provider") or item.get("institution")
                 or item.get("school") or item.get("organization")
+                or item.get("issuer")
             ),
-            "status": _text(
-                item.get("status") or item.get("details")
-                or item.get("dates") or item.get("date")
+            "status": _joined_details(
+                item,
+                "status", "dates", "date_range", "date", "grade",
+                "activities", "activities_and_societies", "description",
+                "details", "credential_id",
             ),
         })
 
