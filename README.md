@@ -83,16 +83,18 @@ ADMIN_DISPLAY_NAME=Administrator
 
 On startup, the service creates the first administrator from `ADMIN_EMAIL` and
 the existing `ADMIN_PASSWORD`. The administrator password must contain at least
-12 characters. The administrator can then create user accounts under **Users**.
-Each user receives an administrator-assigned temporary password, verifies a
-six-digit email code at sign-in, and must replace the temporary password before
-using the application.
+12 characters. The administrator can invite users under **Users** by entering
+only a name and email address. The private link expires after 48 hours. The user
+creates their own password, verifies a six-digit email code, and follows the
+self-service onboarding checklist. Existing accounts do not receive onboarding
+records and continue operating without a forced migration.
 
 Job postings remain shared and deduplicated. Evaluations, notifications,
 resume assets, application packages, and job/application status belong to one
 user. Existing legacy records are assigned to the first administrator
-idempotently. The Resume Manager lets the administrator select the user whose
-resume is being managed. Application Tracking records status, applied date,
+idempotently. Administrators can select any user in Resume Manager; regular
+users can manage only their own resume and LinkedIn sources. Application
+Tracking records status, applied date,
 follow-up date, interview date, outcome, URL, and private notes.
 
 Each user has a versioned JSON candidate profile under **Users → Profile &
@@ -142,22 +144,24 @@ shown in the database-authenticated administrator workflow. Dashboard test
 emails use the signed-in administrator's notification address from **Users →
 Profile & alerts**.
 
-Search terms are user-specific and administrator-managed. Global terms on the
-Settings page are defaults copied to new accounts. The worker combines active
+Search terms are user-specific and self-service, with administrator oversight.
+Existing accounts retain legacy default-term initialization, while invited users
+start with an empty search list and choose their own terms. The worker combines active
 users' enabled terms, searches each unique phrase once, and associates each
 result only with the users subscribed to that phrase. Jobs remain globally
 deduplicated, while Dashboard, Jobs, applications, evaluations, and alerts are
 restricted to each user's assigned openings. The first rollout creates legacy
 assignments so existing users do not lose access to their current job history.
 
-The administrator **Account** page supports concierge onboarding and account
-lifecycle management. Administrators can correct a user's name or login email,
-issue a replacement temporary password, and send password-free onboarding
-instructions. Email changes preserve an intentionally separate notification
+The administrator **Account** page supports invitation and account lifecycle
+management. Administrators can correct a user's name or login email, resend an
+expiring invitation, and issue a replacement temporary password for an
+established account when necessary. Email changes preserve a separate notification
 address, invalidate unused verification/reset tokens, and are audited. The
 Users and Account pages show first-login, profile, search-term, score-backfill,
-access, and last-login status. Temporary passwords are never emailed or shown
-after submission.
+access, and last-login status. Newly invited accounts progress through Invited,
+Onboarding, and Active states automatically. Temporary passwords are never
+emailed or shown after submission.
 
 The administrator **System Settings** page contains only system-wide search,
 scoring, batch, and new-user default controls. User-specific identity, alert,
