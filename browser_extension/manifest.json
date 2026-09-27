@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Calaveras Application Assistant",
+  "version": "0.1.0",
+  "description": "Fills common job application fields for review without submitting applications.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "https://calaveras-job-agent-596810600756.us-west2.run.app/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "action": {
+    "default_title": "Application Assistant",
+    "default_popup": "popup.html"
+  }
+}
