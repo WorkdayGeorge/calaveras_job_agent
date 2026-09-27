@@ -19,7 +19,7 @@ from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
     Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage,
     User, UserJobState, CandidateProfile, UserPreference, Notification, AuditEvent,
-    UserSearchTerm, UserJobMatch, AuthToken,
+    UserSearchTerm, UserJobMatch, AuthToken, UserOnboarding,
 )
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
@@ -63,6 +63,7 @@ from .auth import (
     consume_token,
     database_auth_enabled,
     find_user_by_email,
+    find_valid_token,
     hash_password,
     issue_token,
     new_numeric_code,
@@ -466,12 +467,62 @@ def require_admin(request: Request):
     return None
 
 
+def require_admin_or_self(request: Request, user_id: str):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    if not admin_user(request) and current_user_id(request) != user_id:
+        return HTMLResponse("Access denied", status_code=403)
+    return None
+
+
 def bearer_token(request: Request) -> str | None:
     authorization = request.headers.get("authorization", "")
     scheme, _, value = authorization.partition(" ")
     if scheme.casefold() != "bearer" or not value.strip():
         return None
     return value.strip()
+
+
+def send_invitation(session, user: User, request: Request) -> tuple[bool, str]:
+    raw_token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(hours=48)
+    issue_token(
+        session,
+        user,
+        "onboarding_invite",
+        raw_token,
+        minutes=48 * 60,
+    )
+    onboarding = session.get(UserOnboarding, user.id)
+    if not onboarding:
+        onboarding = UserOnboarding(
+            user_id=user.id,
+            invited_at=now,
+            invitation_expires_at=expires_at,
+            updated_at=now,
+        )
+        session.add(onboarding)
+    else:
+        onboarding.invited_at = now
+        onboarding.invitation_expires_at = expires_at
+        onboarding.updated_at = now
+    session.commit()
+    base_url = (env("PUBLIC_BASE_URL") or str(request.base_url)).rstrip("/")
+    invitation_url = f"{base_url}/onboarding/accept?token={raw_token}"
+    sent, detail = email_text(
+        user.email,
+        "Complete your Calaveras Job Agent account",
+        f"Hello {user.display_name},\n\n"
+        "You have been invited to Calaveras Job Agent. Use this private link "
+        "within 48 hours to create your password and verify your email:\n\n"
+        f"{invitation_url}\n\n"
+        "After verification, the onboarding guide will help you add your "
+        "resume or LinkedIn profile, job-search terms, alerts, and application answers.\n\n"
+        "If you were not expecting this invitation, ignore this email.",
+    )
+    return sent, detail
 
 @app.on_event("startup")
 def startup():
@@ -514,11 +565,11 @@ def login(request: Request, password: str = Form(...), email: str = Form("")):
             user = find_user_by_email(session, email)
             if (
                 not user
-                or user.status != "active"
+                or user.status not in {"active", "onboarding"}
                 or (user.locked_until and utc_aware(user.locked_until) > now)
                 or not verify_password(password, user.password_hash)
             ):
-                if user and user.status == "active":
+                if user and user.status in {"active", "onboarding"}:
                     user.failed_login_attempts += 1
                     if user.failed_login_attempts >= 5:
                         user.locked_until = now + timedelta(minutes=15)
@@ -648,7 +699,7 @@ def forgot_password(request: Request, email: str = Form(...)):
     if database_auth_enabled():
         with SessionLocal() as session:
             user = find_user_by_email(session, email)
-            if user and user.status == "active":
+            if user and user.status in {"active", "onboarding"}:
                 raw_token = secrets.token_urlsafe(32)
                 issue_token(session, user, "password_reset", raw_token, minutes=30)
                 public_base_url = (env("PUBLIC_BASE_URL") or str(request.base_url)).rstrip("/")
@@ -686,6 +737,205 @@ def reset_password(request: Request, token: str = Form(...), new_password: str =
         session.commit()
         record_audit(session, "password_reset_completed", target_user_id=user.id, request=request)
     return RedirectResponse("/login?message=Password+reset", status_code=303)
+
+
+@app.get("/onboarding/accept", response_class=HTMLResponse)
+def accept_invitation_page(request: Request, token: str = ""):
+    with SessionLocal() as session:
+        token_row = find_valid_token(session, "onboarding_invite", token)
+        user = session.get(User, token_row.user_id) if token_row else None
+    return templates.TemplateResponse(request, "accept_invitation.html", {
+        "token": token,
+        "user": user,
+        "error": None if user else "This invitation is invalid or expired.",
+    }, status_code=200 if user else 400)
+
+
+@app.post("/onboarding/accept", response_class=HTMLResponse)
+def accept_invitation(
+    request: Request,
+    token: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    error = None
+    if new_password != confirm_password:
+        error = "Passwords do not match."
+    with SessionLocal() as session:
+        token_row = find_valid_token(session, "onboarding_invite", token)
+        user = session.get(User, token_row.user_id) if token_row else None
+        if not user:
+            error = "This invitation is invalid or expired."
+        password_hash = None
+        if not error:
+            try:
+                password_hash = hash_password(new_password)
+            except ValueError as exc:
+                error = str(exc)
+        if error:
+            return templates.TemplateResponse(request, "accept_invitation.html", {
+                "token": token,
+                "user": user,
+                "error": error,
+            }, status_code=400)
+
+        code = new_numeric_code()
+        issue_token(session, user, "onboarding_otp", code, minutes=10)
+        sent, _ = email_text(
+            user.email,
+            "Verify your Calaveras Job Agent email",
+            f"Your six-digit verification code is: {code}\n\n"
+            "This code expires in 10 minutes.",
+        )
+        if not sent:
+            return templates.TemplateResponse(request, "accept_invitation.html", {
+                "token": token,
+                "user": user,
+                "error": "The verification code could not be sent. Please try again.",
+            }, status_code=503)
+
+        user.password_hash = password_hash
+        user.updated_at = datetime.now(timezone.utc)
+        onboarding = session.get(UserOnboarding, user.id)
+        if onboarding:
+            onboarding.password_set_at = user.updated_at
+            onboarding.updated_at = user.updated_at
+        session.commit()
+        consume_token(session, user, "onboarding_invite", token)
+        record_audit(
+            session,
+            "onboarding_password_created",
+            target_user_id=user.id,
+            request=request,
+        )
+        request.session.clear()
+        request.session["pending_onboarding_user_id"] = user.id
+    return RedirectResponse("/onboarding/verify", status_code=303)
+
+
+@app.get("/onboarding/verify", response_class=HTMLResponse)
+def verify_onboarding_page(request: Request):
+    if not request.session.get("pending_onboarding_user_id"):
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(
+        request,
+        "verify_onboarding.html",
+        {"error": None},
+    )
+
+
+@app.post("/onboarding/verify", response_class=HTMLResponse)
+def verify_onboarding(request: Request, code: str = Form(...)):
+    user_id = request.session.get("pending_onboarding_user_id")
+    with SessionLocal() as session:
+        user = session.get(User, user_id) if user_id else None
+        if not user or not consume_token(session, user, "onboarding_otp", code):
+            return templates.TemplateResponse(
+                request,
+                "verify_onboarding.html",
+                {"error": "Invalid or expired code."},
+                status_code=401,
+            )
+        now = datetime.now(timezone.utc)
+        user.status = "onboarding"
+        user.must_change_password = False
+        user.last_login_at = now
+        user.updated_at = now
+        onboarding = session.get(UserOnboarding, user.id)
+        if onboarding:
+            onboarding.email_verified_at = now
+            onboarding.updated_at = now
+        session.commit()
+        ensure_user_profile_records(session, user)
+        ensure_user_search_terms(session, user)
+        record_audit(
+            session,
+            "onboarding_email_verified",
+            actor_user_id=user.id,
+            target_user_id=user.id,
+            request=request,
+        )
+        request.session.clear()
+        request.session.update({
+            "user_id": user.id,
+            "role": user.role,
+            "email": user.email,
+            "must_change_password": False,
+        })
+    return RedirectResponse("/onboarding", status_code=303)
+
+
+@app.post("/onboarding/resend-code")
+def resend_onboarding_code(request: Request):
+    user_id = request.session.get("pending_onboarding_user_id")
+    with SessionLocal() as session:
+        user = session.get(User, user_id) if user_id else None
+        if not user or user.status != "invited":
+            return RedirectResponse("/login", status_code=303)
+        code = new_numeric_code()
+        issue_token(session, user, "onboarding_otp", code, minutes=10)
+        sent, _ = email_text(
+            user.email,
+            "Verify your Calaveras Job Agent email",
+            f"Your six-digit verification code is: {code}\n\n"
+            "This code expires in 10 minutes.",
+        )
+    message = "A+new+code+was+sent" if sent else "The+code+could+not+be+sent"
+    return RedirectResponse(f"/onboarding/verify?message={message}", status_code=303)
+
+
+@app.get("/onboarding", response_class=HTMLResponse)
+def onboarding_page(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, current_user_id(request))
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        onboarding = session.get(UserOnboarding, user.id)
+        profile = session.get(CandidateProfile, user.id)
+        source_count = session.scalar(
+            select(func.count(ResumeAsset.id)).where(
+                ResumeAsset.user_id == user.id,
+                ResumeAsset.is_current.is_(True),
+            )
+        ) or 0
+        term_count = session.scalar(
+            select(func.count(UserSearchTerm.id)).where(
+                UserSearchTerm.user_id == user.id,
+                UserSearchTerm.enabled.is_(True),
+            )
+        ) or 0
+        preference = session.get(UserPreference, user.id)
+        steps = {
+            "account": bool(onboarding and onboarding.email_verified_at),
+            "source": source_count > 0,
+            "profile": bool(profile and profile.is_active),
+            "search": term_count > 0,
+            "notifications": bool(preference and preference.notification_email),
+        }
+        existing_user = onboarding is None
+        complete = existing_user or all(steps.values())
+        if onboarding and complete and not onboarding.completed_at:
+            onboarding.completed_at = datetime.now(timezone.utc)
+            onboarding.updated_at = onboarding.completed_at
+            user.status = "active"
+            user.updated_at = onboarding.completed_at
+            session.commit()
+            record_audit(
+                session,
+                "onboarding_completed",
+                actor_user_id=user.id,
+                target_user_id=user.id,
+                request=request,
+            )
+    return templates.TemplateResponse(request, "onboarding.html", {
+        "user": user,
+        "steps": steps,
+        "complete": complete,
+        "existing_user": existing_user,
+    })
 
 @app.post("/logout")
 def logout(request: Request):
@@ -1525,7 +1775,14 @@ def users_page(request: Request):
         return denial
     with SessionLocal() as session:
         users = session.scalars(select(User).order_by(User.created_at.desc())).all()
-    return templates.TemplateResponse(request, "users.html", {"users": users})
+        onboarding = {
+            row.user_id: row
+            for row in session.scalars(select(UserOnboarding)).all()
+        }
+    return templates.TemplateResponse(request, "users.html", {
+        "users": users,
+        "onboarding": onboarding,
+    })
 
 
 def analytics_context(period: str, start: str | None, end: str | None):
@@ -1627,7 +1884,6 @@ def create_user(
     request: Request,
     email: str = Form(...),
     display_name: str = Form(...),
-    temporary_password: str = Form(...),
 ):
     denial = require_admin(request)
     if denial:
@@ -1635,10 +1891,6 @@ def create_user(
     normalized_email = normalize_login_email(email)
     if not normalized_email:
         return RedirectResponse("/admin/users?message=Enter+a+valid+email", status_code=303)
-    try:
-        password_hash = hash_password(temporary_password)
-    except ValueError:
-        return RedirectResponse("/admin/users?message=Temporary+password+must+be+at+least+12+characters", status_code=303)
     with SessionLocal() as session:
         if find_user_by_email(session, normalized_email):
             return RedirectResponse("/admin/users?message=That+email+already+exists", status_code=303)
@@ -1646,25 +1898,26 @@ def create_user(
         user = User(
             email=normalized_email,
             display_name=display_name.strip() or normalized_email,
-            password_hash=password_hash,
+            password_hash=hash_password(secrets.token_urlsafe(32)),
             role="user",
-            status="active",
+            status="invited",
             must_change_password=True,
             created_at=now,
             updated_at=now,
         )
         session.add(user)
         session.commit()
-        ensure_user_profile_records(session, user)
-        ensure_user_search_terms(session, user)
+        sent, detail = send_invitation(session, user, request)
         record_audit(
             session,
-            "user_created",
+            "user_invited" if sent else "user_invitation_failed",
             actor_user_id=request.session.get("user_id"),
             target_user_id=user.id,
             request=request,
+            detail={"delivery": detail},
         )
-    return RedirectResponse("/admin/users?message=User+created", status_code=303)
+    message = "Invitation+sent" if sent else "User+created;+invitation+email+failed"
+    return RedirectResponse(f"/admin/users?message={message}", status_code=303)
 
 
 @app.post("/admin/users/{user_id}/status")
@@ -1672,7 +1925,7 @@ def change_user_status(user_id: str, request: Request, status: str = Form(...)):
     denial = require_admin(request)
     if denial:
         return denial
-    if status not in {"active", "suspended", "archived"}:
+    if status not in {"invited", "onboarding", "active", "suspended", "archived"}:
         return JSONResponse({"error": "invalid status"}, status_code=400)
     if user_id == request.session.get("user_id") and status != "active":
         return RedirectResponse("/admin/users?message=You+cannot+suspend+your+own+account", status_code=303)
@@ -1711,11 +1964,13 @@ def user_account_page(user_id: str, request: Request):
             UserSearchTerm.user_id == user_id,
             UserSearchTerm.enabled.is_(True),
         )) or 0
+        onboarding = session.get(UserOnboarding, user_id)
     return templates.TemplateResponse(request, "user_account.html", {
         "user": user,
         "profile": profile,
         "term_count": term_count,
         "backfill": progress,
+        "onboarding": onboarding,
     })
 
 
@@ -1806,7 +2061,28 @@ def send_user_onboarding(user_id: str, request: Request):
         user = session.get(User, user_id)
         if not user:
             return HTMLResponse("User not found", status_code=404)
-        if user.status != "active":
+        if user.status == "invited":
+            sent, _ = send_invitation(session, user, request)
+            event_type = (
+                "user_invitation_resent" if sent
+                else "user_invitation_failed"
+            )
+            record_audit(
+                session,
+                event_type,
+                actor_user_id=current_user_id(request),
+                target_user_id=user_id,
+                request=request,
+            )
+            message = (
+                "Invitation+email+sent"
+                if sent else "Invitation+email+could+not+be+sent"
+            )
+            return RedirectResponse(
+                f"/admin/users/{user_id}/account?message={message}",
+                status_code=303,
+            )
+        if user.status not in {"active", "onboarding"}:
             return RedirectResponse(
                 f"/admin/users/{user_id}/account?message=Activate+the+account+before+sending+onboarding",
                 status_code=303,
@@ -1835,9 +2111,20 @@ def send_user_onboarding(user_id: str, request: Request):
     )
 
 
+@app.get("/profile")
+def own_profile_page(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    user_id = current_user_id(request)
+    if not user_id:
+        return HTMLResponse("Account ownership is required", status_code=409)
+    return RedirectResponse(f"/admin/users/{user_id}/profile", status_code=303)
+
+
 @app.get("/admin/users/{user_id}/profile", response_class=HTMLResponse)
 def user_profile_page(user_id: str, request: Request):
-    denial = require_admin(request)
+    denial = require_admin_or_self(request, user_id)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -1892,7 +2179,7 @@ def save_user_profile(
     profile_review: str | None = Form(None),
     queue_backfill_after_save: str | None = Form(None),
 ):
-    denial = require_admin(request)
+    denial = require_admin_or_self(request, user_id)
     if denial:
         return denial
     profile_data = structured_candidate_profile(
@@ -1999,7 +2286,7 @@ def save_user_profile(
 
 @app.post("/admin/users/{user_id}/search-terms")
 def add_user_search_term(user_id: str, request: Request, term: str = Form(...)):
-    denial = require_admin(request)
+    denial = require_admin_or_self(request, user_id)
     if denial:
         return denial
     normalized = normalize_search_term(term)
@@ -2028,7 +2315,7 @@ def add_user_search_term(user_id: str, request: Request, term: str = Form(...)):
 
 @app.post("/admin/users/{user_id}/search-terms/{term_id}/toggle")
 def toggle_user_search_term(user_id: str, term_id: str, request: Request):
-    denial = require_admin(request)
+    denial = require_admin_or_self(request, user_id)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -2050,7 +2337,7 @@ def toggle_user_search_term(user_id: str, term_id: str, request: Request):
 
 @app.post("/admin/users/{user_id}/search-terms/{term_id}/delete")
 def delete_user_search_term(user_id: str, term_id: str, request: Request):
-    denial = require_admin(request)
+    denial = require_admin_or_self(request, user_id)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -2072,7 +2359,7 @@ def delete_user_search_term(user_id: str, term_id: str, request: Request):
 
 @app.post("/admin/users/{user_id}/backfill")
 def queue_user_backfill(user_id: str, request: Request):
-    denial = require_admin(request)
+    denial = require_admin_or_self(request, user_id)
     if denial:
         return denial
     with SessionLocal() as session:
@@ -2133,12 +2420,17 @@ def runs_page(request: Request):
 
 @app.get("/resumes", response_class=HTMLResponse)
 def resumes_page(request: Request, user_id: str | None = None):
-    denial = require_admin(request)
+    denial = require_auth(request)
     if denial:
         return denial
     with SessionLocal() as session:
-        users = session.scalars(select(User).order_by(User.display_name)).all()
-        selected_user_id = user_id or current_user_id(request)
+        if admin_user(request):
+            users = session.scalars(select(User).order_by(User.display_name)).all()
+            selected_user_id = user_id or current_user_id(request)
+        else:
+            selected_user_id = current_user_id(request)
+            own_user = session.get(User, selected_user_id)
+            users = [own_user] if own_user else []
         if selected_user_id and not session.get(User, selected_user_id):
             selected_user_id = current_user_id(request)
         assets = session.scalars(
@@ -2155,13 +2447,15 @@ def resumes_page(request: Request, user_id: str | None = None):
 
 @app.post("/resumes/{asset_id}/profile-suggestion", response_class=HTMLResponse)
 def resume_profile_suggestion(asset_id: str, request: Request):
-    denial = require_admin(request)
+    denial = require_auth(request)
     if denial:
         return denial
     with SessionLocal() as session:
         asset = session.get(ResumeAsset, asset_id)
         if not asset or not asset.user_id:
             return HTMLResponse("Resume not found", status_code=404)
+        if not admin_user(request) and asset.user_id != current_user_id(request):
+            return HTMLResponse("Access denied", status_code=403)
         user = session.get(User, asset.user_id)
         if not user:
             return HTMLResponse("User not found", status_code=404)
@@ -2244,7 +2538,7 @@ async def upload_resume(
     user_id: str = Form(""),
     resume: UploadFile = File(...),
 ):
-    denial = require_admin(request)
+    denial = require_auth(request)
     if denial:
         return denial
     allowed_types = {"focused", "all-work-experience", "linkedin-profile"}
@@ -2269,6 +2563,8 @@ async def upload_resume(
 
     with SessionLocal() as session:
         target_user_id = user_id or current_user_id(request)
+        if not admin_user(request):
+            target_user_id = current_user_id(request)
         if not target_user_id or not session.get(User, target_user_id):
             return JSONResponse({"error": "invalid user"}, status_code=400)
         uri = save_resume(filename, content, resume_type, target_user_id)
