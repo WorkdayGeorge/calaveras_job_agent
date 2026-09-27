@@ -43,6 +43,16 @@ class AuthToken(Base):
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+
+class ApplicationAssistantProfile(Base):
+    __tablename__ = "application_assistant_profiles"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    contact_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    standard_answers: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
