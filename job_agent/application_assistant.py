@@ -115,6 +115,10 @@ def user_for_extension_token(session, raw_token: str | None) -> User | None:
     if not token or expires_at < now:
         return None
     user = session.get(User, token.user_id)
-    if not user or user.status != "active" or user.must_change_password:
+    if (
+        not user
+        or user.status not in {"active", "onboarding"}
+        or user.must_change_password
+    ):
         return None
     return user
