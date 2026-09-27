@@ -1,0 +1,16 @@
+:root { color-scheme: light; }
+body { width:340px; margin:0; padding:16px; font:14px/1.4 system-ui,-apple-system,Segoe UI,sans-serif; color:#162033; background:#f8fafc; }
+h1 { margin:0 0 4px; font-size:19px; }
+.muted { color:#667085; margin-top:0; }
+section { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; margin:12px 0; }
+label { display:block; font-weight:650; margin:8px 0 5px; }
+input,select { width:100%; box-sizing:border-box; padding:9px; border:1px solid #cfd4dc; border-radius:7px; }
+button { width:100%; border:0; border-radius:7px; padding:9px; margin-top:10px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; }
+button.good { background:#16803c; }
+button.secondary { background:#475467; }
+button:disabled { opacity:.55; cursor:wait; }
+.identity { font-weight:700; margin-bottom:8px; }
+#status { min-height:20px; margin:10px 2px; font-weight:650; }
+#status.error { color:#b42318; }
+#status.success { color:#16803c; }
+.warning { color:#8a4b08; font-size:12px; margin-bottom:0; }
