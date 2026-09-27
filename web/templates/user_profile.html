@@ -9,8 +9,8 @@
 
 {% if suggestion_asset %}
 <div class="card" style="margin-bottom:18px;border-color:#2563eb">
-  <h2 style="margin-top:0">Resume suggestion ready</h2>
-  <p><strong>{{ suggestion_asset.filename }}</strong> was reviewed. The saved profile has not changed.</p>
+  <h2 style="margin-top:0">{{ suggestion_source_label|default('Resume') }} suggestion ready</h2>
+  <p><strong>{{ suggestion_asset.filename }}</strong> was reviewed as a {{ suggestion_source_label|default('resume') }}. The saved profile has not changed.</p>
   <p class="muted">Review and edit every suggested field below, then select Save. Search terms can guide career targets but are never treated as proof of skills or experience.</p>
   {% if identity_warning %}<p class="warn">{{ identity_warning }}</p>{% endif %}
   <div class="grid">
