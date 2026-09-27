@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>Application Assistant</h1>
+  <p class="muted">Fill common fields, then review everything before continuing.</p>
+
+  <section id="setup">
+    <label for="token">Extension access token</label>
+    <input id="token" type="password" autocomplete="off" placeholder="Paste token from the job agent">
+    <button id="saveToken">Save &amp; Connect</button>
+  </section>
+
+  <section id="assistant" hidden>
+    <div id="identity" class="identity"></div>
+    <label for="resume">Resume</label>
+    <select id="resume"><option value="">Do not upload a resume</option></select>
+    <button id="fill" class="good">Fill This Application</button>
+    <button id="disconnect" class="secondary">Remove Token</button>
+  </section>
+
+  <div id="status" role="status"></div>
+  <p class="warning">The assistant never submits an application and skips sensitive self-identification and legal-attestation fields.</p>
+  <script src="popup.js"></script>
+</body>
+</html>
