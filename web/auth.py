@@ -152,6 +152,25 @@ def consume_token(session, user: User, purpose: str, raw_token: str, max_attempt
     return valid
 
 
+def find_valid_token(session, purpose: str, raw_token: str | None) -> AuthToken | None:
+    if not raw_token:
+        return None
+    now = datetime.now(timezone.utc)
+    token = session.scalar(
+        select(AuthToken)
+        .where(
+            AuthToken.purpose == purpose,
+            AuthToken.token_hash == token_digest(raw_token),
+            AuthToken.used_at.is_(None),
+        )
+        .order_by(AuthToken.created_at.desc())
+        .limit(1)
+    )
+    if not token or utc_aware(token.expires_at) < now:
+        return None
+    return token
+
+
 def invalidate_unused_tokens(session, user_id: str) -> None:
     session.execute(
         update(AuthToken)
