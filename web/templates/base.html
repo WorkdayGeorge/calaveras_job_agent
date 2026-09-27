@@ -45,13 +45,15 @@
     <strong>Calaveras Job Agent</strong>
     <a href="/">Dashboard</a>
     <a href="/jobs">Jobs</a>
+    <a href="/profile">Profile</a>
+    <a href="/resumes">Resumes</a>
     <a href="/application-assistant">Application Assistant</a>
+    <a href="/onboarding">Getting Started</a>
     {% if request.session.get("role", "administrator") == "administrator" %}
     <a href="/admin/analytics">Analytics</a>
     <a href="/admin/users">Users</a>
     <a href="/admin/notifications">Notifications</a>
     <a href="/settings">Settings</a>
-    <a href="/resumes">Resumes</a>
     <a href="/sources">Sources</a>
     <a href="/runs">Runs</a>
     <a href="/admin/audit">Audit Log</a>
