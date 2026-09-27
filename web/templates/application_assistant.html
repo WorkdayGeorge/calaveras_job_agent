@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Application Assistant</h1>
+<p class="muted">Save reusable answers for the browser extension. The assistant fills application fields, but you review and submit every application yourself.</p>
+{% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:16px">{{ request.query_params.get("message") }}</div>{% endif %}
+
+<form method="post" action="/application-assistant/profile">
+<div class="card">
+  <h2 style="margin-top:0">Contact information</h2>
+  <p><strong>{{ user.display_name }}</strong> — {{ user.email }}</p>
+  <div class="row"><div><label>Phone</label><input name="phone" value="{{ assistant.contact_data.get('phone', '') }}"></div><div><label>LinkedIn URL</label><input type="url" name="linkedin_url" value="{{ assistant.contact_data.get('linkedin_url', '') }}"></div></div>
+  <label>Address line 1</label><input name="address_line_1" value="{{ assistant.contact_data.get('address_line_1', '') }}">
+  <label>Address line 2</label><input name="address_line_2" value="{{ assistant.contact_data.get('address_line_2', '') }}">
+  <div class="row"><div><label>City</label><input name="city" value="{{ assistant.contact_data.get('city', '') }}"></div><div><label>State</label><input name="state" value="{{ assistant.contact_data.get('state', '') }}"></div><div><label>Postal code</label><input name="postal_code" value="{{ assistant.contact_data.get('postal_code', '') }}"></div><div><label>Country</label><input name="country" value="{{ assistant.contact_data.get('country', 'United States') }}"></div></div>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <h2 style="margin-top:0">Standard application answers</h2>
+  <p class="muted">Choose Review when the answer may vary by employer or job.</p>
+  <div class="row">
+    <div><label>Authorized to work in the United States?</label><select name="authorized_to_work">{% for value, label in [('review','Review each time'),('yes','Yes'),('no','No')] %}<option value="{{ value }}" {% if assistant.standard_answers.get('authorized_to_work', 'review') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div><label>Require current or future sponsorship?</label><select name="requires_sponsorship">{% for value, label in [('review','Review each time'),('yes','Yes'),('no','No')] %}<option value="{{ value }}" {% if assistant.standard_answers.get('requires_sponsorship', 'review') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div><label>Willing to relocate?</label><select name="willing_to_relocate">{% for value, label in [('review','Review each time'),('yes','Yes'),('no','No')] %}<option value="{{ value }}" {% if assistant.standard_answers.get('willing_to_relocate', 'review') == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="row"><div><label>Available start date</label><input name="available_start_date" value="{{ assistant.standard_answers.get('available_start_date', '') }}" placeholder="Immediately or a specific date"></div><div><label>Desired salary</label><input name="desired_salary" value="{{ assistant.standard_answers.get('desired_salary', '') }}" placeholder="Leave blank to review each time"></div><div><label>Remote-work preference</label><input name="remote_preference" value="{{ assistant.standard_answers.get('remote_preference', '') }}" placeholder="On-site, hybrid, remote, or flexible"></div></div>
+  <button class="btn good" style="margin-top:16px">Save Application Answers</button>
+</div>
+</form>
+
+<div class="card" style="margin-top:18px">
+  <h2 style="margin-top:0">Chrome extension connection</h2>
+  <p>The extension uses a revocable access token. It cannot change your profile or submit an application.</p>
+  <p><strong>Service URL</strong><br><code>{{ request.base_url|string|trim('/') }}</code></p>
+  {% if new_token %}
+  <div class="card" style="background:#f0fdf4;border-color:#86efac">
+    <strong>Copy this token now. It will not be shown again.</strong>
+    <p style="word-break:break-all"><code>{{ new_token }}</code></p>
+  </div>
+  {% elif active_token %}
+  <p class="good">Extension access is active.</p>
+  {% else %}
+  <p class="muted">No extension access token is active.</p>
+  {% endif %}
+  <form class="inline" method="post" action="/application-assistant/token"><button class="btn">{{ 'Replace Access Token' if active_token else 'Create Access Token' }}</button></form>
+  {% if active_token %}<form class="inline" method="post" action="/application-assistant/token/revoke"><button class="btn danger">Revoke Extension Access</button></form>{% endif %}
+  <p class="muted">Tokens expire after 90 days. Revoke access immediately if a computer or token is lost.</p>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <h2 style="margin-top:0">MVP safety limits</h2>
+  <ul>
+    <li>The extension never selects Submit.</li>
+    <li>Demographic, disability, veteran, birth-date, Social Security, signature, and legal-attestation fields are skipped.</li>
+    <li>Review every completed field before continuing.</li>
+  </ul>
+</div>
+{% endblock %}
