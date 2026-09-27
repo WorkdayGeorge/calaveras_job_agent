@@ -1924,6 +1924,11 @@ def resume_profile_suggestion(asset_id: str, request: Request):
         enabled_terms = [term.term for term in user_terms if term.enabled]
         error = None
         identity_warning = None
+        source_label = (
+            "LinkedIn profile"
+            if asset.resume_type == "linkedin-profile"
+            else "resume"
+        )
         proposal = profile.profile_data
         try:
             resume_text = asset.extracted_text
@@ -1947,9 +1952,10 @@ def resume_profile_suggestion(asset_id: str, request: Request):
                 merge_profile,
                 enabled_terms,
                 candidate_name=user.display_name,
+                source_label=source_label,
             )
         except Exception as exc:
-            error = f"Resume review could not be prepared: {exc}"
+            error = f"{source_label} review could not be prepared: {exc}"
         if not error:
             record_audit(
                 session,
@@ -1957,7 +1963,11 @@ def resume_profile_suggestion(asset_id: str, request: Request):
                 actor_user_id=current_user_id(request),
                 target_user_id=user.id,
                 request=request,
-                detail={"resume_asset_id": asset.id, "filename": asset.filename},
+                detail={
+                    "resume_asset_id": asset.id,
+                    "filename": asset.filename,
+                    "source_type": asset.resume_type,
+                },
             )
     return templates.TemplateResponse(
         request,
@@ -1969,6 +1979,7 @@ def resume_profile_suggestion(asset_id: str, request: Request):
             "profile_data": proposal,
             "saved_profile_data": profile.profile_data if not error else None,
             "suggestion_asset": asset if not error else None,
+            "suggestion_source_label": source_label,
             "identity_warning": identity_warning,
             "review_mode": not error,
             "backfill": progress,
@@ -1989,10 +2000,15 @@ async def upload_resume(
     denial = require_admin(request)
     if denial:
         return denial
-    if resume_type not in {"focused", "all-work-experience"}:
-        return JSONResponse({"error": "invalid resume type"}, status_code=400)
+    allowed_types = {"focused", "all-work-experience", "linkedin-profile"}
+    if resume_type not in allowed_types:
+        return JSONResponse({"error": "invalid document type"}, status_code=400)
 
     filename = resume.filename or "resume.docx"
+    if resume_type == "linkedin-profile" and not filename.lower().endswith(".pdf"):
+        return JSONResponse(
+            {"error": "upload a LinkedIn profile PDF"}, status_code=400
+        )
     if not filename.lower().endswith((".docx", ".pdf")):
         return JSONResponse({"error": "upload a DOCX or PDF resume"}, status_code=400)
 
@@ -2029,6 +2045,6 @@ async def upload_resume(
         ))
         session.commit()
     return RedirectResponse(
-        f"/resumes?user_id={target_user_id}&message=Resume+uploaded;+review+the+suggested+profile+before+saving",
+        f"/resumes?user_id={target_user_id}&message=Document+uploaded;+review+the+suggested+profile+before+saving",
         status_code=303,
     )
