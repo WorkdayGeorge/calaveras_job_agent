@@ -5,7 +5,10 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from .models import AppSetting, Job, SearchTerm, User, UserJobMatch, UserSearchTerm
+from .models import (
+    AppSetting, Job, SearchTerm, User, UserJobMatch, UserOnboarding,
+    UserSearchTerm,
+)
 
 
 def normalize_search_term(value: str) -> str:
@@ -26,6 +29,12 @@ def ensure_user_search_terms(session, user: User) -> list[UserSearchTerm]:
         session.add(AppSetting(key=marker_key, value="complete", updated_at=now))
         session.commit()
         return terms
+    # Newly invited users choose their own search terms during onboarding.
+    # Existing accounts retain the legacy default-term seeding behavior.
+    if session.get(UserOnboarding, user.id):
+        session.add(AppSetting(key=marker_key, value="complete", updated_at=now))
+        session.commit()
+        return []
     defaults = session.scalars(
         select(SearchTerm).where(SearchTerm.enabled.is_(True)).order_by(SearchTerm.term)
     ).all()
