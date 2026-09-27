@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -19,7 +19,7 @@ from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
     Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage,
     User, UserJobState, CandidateProfile, UserPreference, Notification, AuditEvent,
-    UserSearchTerm, UserJobMatch,
+    UserSearchTerm, UserJobMatch, AuthToken,
 )
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_job_sources
@@ -46,6 +46,11 @@ from job_agent.user_search import (
     ensure_user_search_terms,
     normalize_search_term,
     seed_legacy_job_matches,
+)
+from job_agent.application_assistant import (
+    ensure_assistant_profile,
+    save_assistant_profile,
+    user_for_extension_token,
 )
 
 
@@ -459,6 +464,14 @@ def require_admin(request: Request):
     if not admin_user(request):
         return HTMLResponse("Administrator access required", status_code=403)
     return None
+
+
+def bearer_token(request: Request) -> str | None:
+    authorization = request.headers.get("authorization", "")
+    scheme, _, value = authorization.partition(" ")
+    if scheme.casefold() != "bearer" or not value.strip():
+        return None
+    return value.strip()
 
 @app.on_event("startup")
 def startup():
@@ -1268,6 +1281,240 @@ def build_application_package(job_id: str, request: Request):
     return RedirectResponse(
         f"/jobs/{job_id}/application",
         status_code=303,
+    )
+
+
+@app.get("/application-assistant", response_class=HTMLResponse)
+def application_assistant_page(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, current_user_id(request))
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        assistant = ensure_assistant_profile(session, user)
+        active_token = session.scalar(
+            select(AuthToken)
+            .where(
+                AuthToken.user_id == user.id,
+                AuthToken.purpose == "application_assistant",
+                AuthToken.used_at.is_(None),
+                AuthToken.expires_at > datetime.now(timezone.utc),
+            )
+            .order_by(desc(AuthToken.created_at))
+            .limit(1)
+        )
+    return templates.TemplateResponse(request, "application_assistant.html", {
+        "user": user,
+        "assistant": assistant,
+        "active_token": active_token,
+        "new_token": None,
+    })
+
+
+@app.post("/application-assistant/profile", response_class=HTMLResponse)
+def save_application_assistant_page(
+    request: Request,
+    phone: str = Form(""),
+    address_line_1: str = Form(""),
+    address_line_2: str = Form(""),
+    city: str = Form(""),
+    state: str = Form(""),
+    postal_code: str = Form(""),
+    country: str = Form("United States"),
+    linkedin_url: str = Form(""),
+    authorized_to_work: str = Form("review"),
+    requires_sponsorship: str = Form("review"),
+    willing_to_relocate: str = Form("review"),
+    available_start_date: str = Form(""),
+    desired_salary: str = Form(""),
+    remote_preference: str = Form(""),
+):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, current_user_id(request))
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        try:
+            save_assistant_profile(
+                session,
+                user,
+                {
+                    "phone": phone,
+                    "address_line_1": address_line_1,
+                    "address_line_2": address_line_2,
+                    "city": city,
+                    "state": state,
+                    "postal_code": postal_code,
+                    "country": country,
+                    "linkedin_url": linkedin_url,
+                },
+                {
+                    "authorized_to_work": authorized_to_work,
+                    "requires_sponsorship": requires_sponsorship,
+                    "willing_to_relocate": willing_to_relocate,
+                    "available_start_date": available_start_date,
+                    "desired_salary": desired_salary,
+                    "remote_preference": remote_preference,
+                },
+            )
+        except ValueError as exc:
+            return HTMLResponse(str(exc), status_code=400)
+        record_audit(
+            session,
+            "application_assistant_profile_updated",
+            actor_user_id=user.id,
+            target_user_id=user.id,
+            request=request,
+        )
+    return RedirectResponse(
+        "/application-assistant?message=Application+answers+saved",
+        status_code=303,
+    )
+
+
+@app.post("/application-assistant/token", response_class=HTMLResponse)
+def create_application_assistant_token(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    raw_token = secrets.token_urlsafe(32)
+    with SessionLocal() as session:
+        user = session.get(User, current_user_id(request))
+        if not user:
+            return HTMLResponse("User not found", status_code=404)
+        assistant = ensure_assistant_profile(session, user)
+        active_token = issue_token(
+            session,
+            user,
+            "application_assistant",
+            raw_token,
+            minutes=60 * 24 * 90,
+        )
+        record_audit(
+            session,
+            "application_assistant_token_created",
+            actor_user_id=user.id,
+            target_user_id=user.id,
+            request=request,
+        )
+    return templates.TemplateResponse(request, "application_assistant.html", {
+        "user": user,
+        "assistant": assistant,
+        "active_token": active_token,
+        "new_token": raw_token,
+    })
+
+
+@app.post("/application-assistant/token/revoke")
+def revoke_application_assistant_token(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as session:
+        user_id = current_user_id(request)
+        tokens = session.scalars(
+            select(AuthToken).where(
+                AuthToken.user_id == user_id,
+                AuthToken.purpose == "application_assistant",
+                AuthToken.used_at.is_(None),
+            )
+        ).all()
+        for token in tokens:
+            token.used_at = now
+        session.commit()
+        record_audit(
+            session,
+            "application_assistant_token_revoked",
+            actor_user_id=user_id,
+            target_user_id=user_id,
+            request=request,
+        )
+    return RedirectResponse(
+        "/application-assistant?message=Extension+access+revoked",
+        status_code=303,
+    )
+
+
+@app.get("/api/application-assistant/profile")
+def application_assistant_api_profile(request: Request):
+    with SessionLocal() as session:
+        user = user_for_extension_token(session, bearer_token(request))
+        if not user:
+            return JSONResponse(
+                {"error": "invalid or expired access token"},
+                status_code=401,
+                headers={"Cache-Control": "no-store"},
+            )
+        assistant = ensure_assistant_profile(session, user)
+        resumes = session.scalars(
+            select(ResumeAsset)
+            .where(
+                ResumeAsset.user_id == user.id,
+                ResumeAsset.resume_type.in_(("focused", "all-work-experience")),
+                ResumeAsset.is_current.is_(True),
+            )
+            .order_by(ResumeAsset.resume_type)
+        ).all()
+        payload = {
+            "identity": {
+                "full_name": user.display_name,
+                "email": user.email,
+                **assistant.contact_data,
+            },
+            "standard_answers": assistant.standard_answers,
+            "resumes": [
+                {
+                    "id": asset.id,
+                    "type": asset.resume_type,
+                    "filename": asset.filename,
+                    "download_path": f"/api/application-assistant/resumes/{asset.id}",
+                }
+                for asset in resumes
+            ],
+        }
+    return JSONResponse(payload, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/application-assistant/resumes/{asset_id}")
+def application_assistant_api_resume(asset_id: str, request: Request):
+    with SessionLocal() as session:
+        user = user_for_extension_token(session, bearer_token(request))
+        if not user:
+            return JSONResponse(
+                {"error": "invalid or expired access token"},
+                status_code=401,
+                headers={"Cache-Control": "no-store"},
+            )
+        asset = session.get(ResumeAsset, asset_id)
+        if (
+            not asset
+            or asset.user_id != user.id
+            or asset.resume_type not in {"focused", "all-work-experience"}
+            or not asset.is_current
+        ):
+            return JSONResponse({"error": "resume not found"}, status_code=404)
+        try:
+            content = read_resume(asset.storage_uri)
+        except Exception:
+            return JSONResponse({"error": "resume unavailable"}, status_code=404)
+        filename = Path(asset.filename).name.replace('"', "")
+        media_type = (
+            "application/pdf"
+            if filename.casefold().endswith(".pdf")
+            else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    return Response(
+        content,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
     )
 
 
