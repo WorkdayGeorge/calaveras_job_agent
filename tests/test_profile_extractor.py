@@ -33,6 +33,31 @@ def test_resume_profile_proposal_accepts_reviewable_json(monkeypatch):
     assert result["name"] == "Monte O. George IV"
 
 
+def test_linkedin_profile_source_is_identified_in_extraction_payload(monkeypatch):
+    proposal = valid_profile()
+    captured = {}
+
+    def create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(output_text=json.dumps(proposal))
+
+    client = SimpleNamespace(responses=SimpleNamespace(create=create))
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(openai, "OpenAI", lambda api_key: client)
+
+    propose_profile_from_resume(
+        "LinkedIn profile text",
+        valid_profile(),
+        [],
+        source_label="LinkedIn profile",
+    )
+
+    payload = json.loads(captured["input"])
+    assert payload["source_type"] == "LinkedIn profile"
+    assert payload["source_text"] == "LinkedIn profile text"
+    assert "resume_text" not in payload
+
+
 def test_resume_profile_proposal_requires_readable_text():
     try:
         propose_profile_from_resume("  ", valid_profile(), [])
