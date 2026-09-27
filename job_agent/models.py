@@ -53,6 +53,18 @@ class ApplicationAssistantProfile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+
+class UserOnboarding(Base):
+    __tablename__ = "user_onboarding"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    invited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    invitation_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    password_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
 
