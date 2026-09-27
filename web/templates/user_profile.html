@@ -2,7 +2,7 @@
 {% block content %}
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
   <div><h1 style="margin-bottom:4px">Candidate Profile</h1><p class="muted">{{ user.display_name }} — {{ user.email }}</p></div>
-  <div><a class="btn secondary" href="/resumes?user_id={{ user.id }}">Resumes</a> <a class="btn secondary" href="/admin/users">Back to Users</a></div>
+  <div><a class="btn secondary" href="/resumes?user_id={{ user.id }}">Resumes</a>{% if request.session.get('role') == 'administrator' %} <a class="btn secondary" href="/admin/users">Back to Users</a>{% endif %}</div>
 </div>
 {% if error %}<div class="card bad" style="margin-bottom:16px">{{ error }}</div>{% endif %}
 {% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:16px">{{ request.query_params.get("message") }}</div>{% endif %}
@@ -90,7 +90,7 @@
 </form>
 
 <div class="card" style="margin-top:18px">
-  <h2 style="margin-top:0">Search terms</h2><p class="muted">Only administrators can manage these terms. Providers search each unique term once and assign matching openings to this user.</p>
+  <h2 style="margin-top:0">Search terms</h2><p class="muted">Providers search each enabled term and assign matching openings to this user.</p>
   <form method="post" action="/admin/users/{{ user.id }}/search-terms" class="row"><div><label>New search phrase</label><input name="term" placeholder="Accounting Clerk" required></div><div style="flex:0 0 auto"><button class="btn">Add term</button></div></form>
   <table style="margin-top:14px"><tr><th>Search term</th><th>Profile alignment</th><th>Enabled</th><th>Actions</th></tr>{% for term in user_terms %}<tr><td>{{ term.term }}</td><td>{% set match = alignment|selectattr('term', 'equalto', term.term)|first %}{% if not term.enabled %}<span class="muted">Disabled</span>{% elif match and match.aligned %}<span class="good">Aligned</span>{% else %}<span class="warn">Review career target</span>{% endif %}</td><td>{{ 'Yes' if term.enabled else 'No' }}</td><td><form class="inline" method="post" action="/admin/users/{{ user.id }}/search-terms/{{ term.id }}/toggle"><button class="btn secondary">{{ 'Disable' if term.enabled else 'Enable' }}</button></form><form class="inline" method="post" action="/admin/users/{{ user.id }}/search-terms/{{ term.id }}/delete"><button class="btn danger">Delete</button></form></td></tr>{% else %}<tr><td colspan="4">No search terms configured.</td></tr>{% endfor %}</table>
 </div>
