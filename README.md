@@ -225,6 +225,13 @@ public U.S. Forest Service (`AG11`) openings within 75 miles of Sonora. Configur
 through environment variables or Secret Manager. Midnight/date-only publication
 values remain unverified rather than being treated as exact posting times.
 
+Multiple providers can be enabled with the comma-separated `JOB_PROVIDERS`
+environment variable. Local direct-employer keys include `angels_camp`,
+`calaveras_court`, `mact_health`, and `ironstone`. The MACT provider uses its
+official ADP feed but retains only Angels Camp, San Andreas, Valley Springs,
+and other explicitly identified Calaveras locations. Official pages without a
+trustworthy posting time are stored with an unverified timestamp.
+
 ## OpenAI evaluator
 
 Set:
