@@ -30,6 +30,9 @@ from .providers.usajobs import USAJobsProvider
 from .providers.amador_county import AmadorCountyProvider
 from .providers.tuolumne_county import TuolumneCountyProvider
 from .providers.worldmark_angels_camp import WorldMarkAngelsCampProvider
+from .providers.calaveras_court import CalaverasCourtProvider
+from .providers.mact_health import MACTHealthProvider
+from .providers.local_career_pages import AngelsCampProvider, IronstoneProvider
 from .repository import upsert_job, evaluation_exists
 from .profile_store import active_evaluation_targets
 from .settings_store import (
@@ -123,6 +126,14 @@ def get_providers():
             providers.append(TuolumneCountyProvider())
         elif name == "worldmark_angels_camp":
             providers.append(WorldMarkAngelsCampProvider())
+        elif name == "calaveras_court":
+            providers.append(CalaverasCourtProvider())
+        elif name == "mact_health":
+            providers.append(MACTHealthProvider())
+        elif name == "angels_camp":
+            providers.append(AngelsCampProvider())
+        elif name == "ironstone":
+            providers.append(IronstoneProvider())
         elif name == "demo":
             providers.append(DemoProvider())
         else:
