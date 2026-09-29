@@ -164,6 +164,42 @@ JOB_SOURCES = [
             {"label": "Travel + Leisure Co. Careers", "url": "https://careers.travelandleisureco.com/jobs/search?query=Angels+Camp"}
         ],
     },
+    {
+        "key": "angels_camp",
+        "name": "City of Angels Camp",
+        "type": "Local government",
+        "description": "Official City of Angels Camp recruitment listings and application links.",
+        "links": [
+            {"label": "City Careers", "url": "https://angelscamp.gov/city-hall/human-resources-2/"}
+        ],
+    },
+    {
+        "key": "calaveras_court",
+        "name": "Calaveras County Superior Court",
+        "type": "Judicial branch",
+        "description": "Official Superior Court job postings hosted by GovernmentJobs/NEOGOV.",
+        "links": [
+            {"label": "Court Careers", "url": "https://www.governmentjobs.com/careers/calaverascourts"}
+        ],
+    },
+    {
+        "key": "mact_health",
+        "name": "MACT Health Board",
+        "type": "Healthcare",
+        "description": "Official MACT Health openings filtered to Calaveras County locations.",
+        "links": [
+            {"label": "MACT Careers", "url": "https://www.macthealth.org/careers"}
+        ],
+    },
+    {
+        "key": "ironstone",
+        "name": "Ironstone Vineyards",
+        "type": "Hospitality / winery",
+        "description": "Official Ironstone employment openings in Murphys.",
+        "links": [
+            {"label": "Ironstone Employment", "url": "https://ironstonevineyards.com/employment/"}
+        ],
+    },
 ]
 
 
@@ -185,21 +221,21 @@ EMPLOYER_COVERAGE = [
         "name": "City of Angels Camp",
         "sector": "Government",
         "area": "Angels Camp",
-        "status": "candidate",
-        "method": "Monitor official HR page",
-        "priority": "High",
+        "status": "integrated",
+        "method": "Direct official-page provider",
+        "priority": "Covered",
         "url": "https://angelscamp.gov/city-hall/human-resources-2/",
-        "notes": "Official page publishes recruitments only while positions are open.",
+        "notes": "Official recruitment rows and application links are monitored directly.",
     },
     {
         "name": "Calaveras County Superior Court",
         "sector": "Government",
         "area": "San Andreas",
-        "status": "candidate",
-        "method": "Monitor official careers page",
-        "priority": "High",
+        "status": "integrated",
+        "method": "Direct NEOGOV provider",
+        "priority": "Covered",
         "url": "https://www.calaveras.courts.ca.gov/general-information/career-opportunities",
-        "notes": "Separate employer and career page from county government.",
+        "notes": "Separate court NEOGOV feed is monitored directly.",
     },
     {
         "name": "California State Parks / Calaveras Big Trees",
@@ -265,11 +301,11 @@ EMPLOYER_COVERAGE = [
         "name": "MACT Health Board",
         "sector": "Healthcare",
         "area": "Angels Camp / San Andreas",
-        "status": "candidate",
-        "method": "Integrate official openings",
-        "priority": "High",
+        "status": "integrated",
+        "method": "Direct ADP provider",
+        "priority": "Covered",
         "url": "https://www.macthealth.org/careers",
-        "notes": "Official careers page serves multiple foothill clinics, including Calaveras locations.",
+        "notes": "Official ADP openings are filtered to Calaveras clinic locations.",
     },
     {
         "name": "Calaveras County Water District",
@@ -315,11 +351,11 @@ EMPLOYER_COVERAGE = [
         "name": "Ironstone Vineyards",
         "sector": "Hospitality / winery",
         "area": "Murphys",
-        "status": "candidate",
-        "method": "Monitor official employment page",
-        "priority": "High",
+        "status": "integrated",
+        "method": "Direct official-page provider",
+        "priority": "Covered",
         "url": "https://ironstonevineyards.com/employment/",
-        "notes": "Official page lists openings in page content and supports direct applications.",
+        "notes": "Official employment-page titles and descriptions are monitored directly.",
     },
     {
         "name": "Greenhorn Creek Resort",
