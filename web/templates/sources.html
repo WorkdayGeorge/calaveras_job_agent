@@ -2,6 +2,36 @@
 {% block content %}
 <h1>Job Sources</h1>
 <p class="muted">Job sites and providers referenced by the agent.</p>
+<div class="grid">
+  <div class="card"><div class="muted">Employers reviewed</div><div class="metric">{{ coverage_summary.total }}</div></div>
+  <div class="card"><div class="muted">Automated coverage</div><div class="metric">{{ coverage_summary.automated }}</div></div>
+  <div class="card"><div class="muted">High-priority gaps</div><div class="metric">{{ coverage_summary.high_priority }}</div></div>
+  <div class="card"><div class="muted">Manual-watch employers</div><div class="metric">{{ coverage_summary.manual }}</div></div>
+</div>
+
+<h2>Calaveras Employer Coverage</h2>
+<p class="muted">Initial countywide audit of major public and private employers. “Covered” includes employers reached through a shared provider such as CalCareers.</p>
+<div style="overflow-x:auto">
+<table>
+  <thead>
+    <tr><th>Employer</th><th>Sector / area</th><th>Coverage</th><th>Recommended method</th><th>Priority</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+  {% for employer in employers %}
+    <tr>
+      <td><strong>{{ employer.name }}</strong><br><a href="{{ employer.url }}" target="_blank" rel="noopener">Official page</a></td>
+      <td>{{ employer.sector }}<br><span class="muted">{{ employer.area }}</span></td>
+      <td><span class="pill">{% if employer.status == "integrated" %}Integrated{% elif employer.status == "covered" %}Covered indirectly{% elif employer.status == "gap" %}Coverage gap{% elif employer.status == "candidate" %}Integration candidate{% else %}Manual watch{% endif %}</span></td>
+      <td>{{ employer.method }}</td>
+      <td>{% if employer.priority == "High" %}<span class="warn">High</span>{% else %}{{ employer.priority }}{% endif %}</td>
+      <td>{{ employer.notes }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>Configured Providers</h2>
 <table>
   <thead>
     <tr><th>Source</th><th>Type</th><th>Description</th><th>Links</th></tr>
