@@ -14,11 +14,13 @@ class Response:
         return self._payload
 
 
-def test_existing_calaveras_configuration_is_preserved():
+def test_calaveras_provider_covers_all_official_edjoin_districts():
     provider = EDJoinCalaverasProvider()
     assert provider.COUNTY_NAME == "Calaveras County"
     assert provider.SOURCE_KEY == "edjoin_calaveras"
-    assert {item["district_id"] for item in provider.DISTRICTS} == {73, 74}
+    assert {item["district_id"] for item in provider.DISTRICTS} == {
+        71, 72, 73, 74, 75
+    }
 
 
 def test_amador_provider_covers_office_and_unified_district():
