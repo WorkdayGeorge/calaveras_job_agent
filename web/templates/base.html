@@ -13,6 +13,16 @@
     header a { color:#dbeafe; text-decoration:none; margin-right:16px; }
     header strong { margin-right:28px; }
     main { max-width:1180px; margin:28px auto; padding:0 20px 60px; }
+    .app-shell { min-height:calc(100vh - 55px); }
+    .app-shell.admin { display:grid; grid-template-columns:230px minmax(0,1fr); }
+    .app-shell.admin main { width:100%; max-width:1220px; }
+    .admin-sidebar { background:#fff; border-right:1px solid var(--line); padding:22px 14px 40px; }
+    .nav-section { margin-bottom:22px; }
+    .nav-section-title { margin:0 10px 7px; color:#98a2b3; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .admin-sidebar a { display:block; padding:8px 10px; margin:2px 0; border-radius:7px; color:#344054; text-decoration:none; font-size:14px; font-weight:600; }
+    .admin-sidebar a:hover { background:#f2f4f7; color:#101828; }
+    .admin-sidebar a.active { background:#eff6ff; color:#1d4ed8; }
+    .user-nav { display:inline; }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
     .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 1px 3px rgba(16,24,40,.04); }
     .metric { font-size:30px; font-weight:750; margin:6px 0; }
@@ -36,27 +46,29 @@
     .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; font-size:12px; font-weight:700; }
     h1 { margin-top:0; }
     h2 { margin-top:28px; }
-    @media (max-width:760px) { header { align-items:flex-start; flex-direction:column; } table { font-size:13px; } .btn { padding:7px 9px; font-size:13px; } }
+    @media (max-width:900px) {
+      .app-shell.admin { display:block; }
+      .admin-sidebar { border-right:0; border-bottom:1px solid var(--line); padding:14px 18px 8px; }
+      .admin-sidebar nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 14px; }
+      .nav-section { margin-bottom:10px; }
+    }
+    @media (max-width:760px) { header { align-items:flex-start; flex-direction:column; } .user-nav a { display:inline-block; margin:4px 12px 4px 0; } table { font-size:13px; } .btn { padding:7px 9px; font-size:13px; } }
+    @media (max-width:480px) { .admin-sidebar nav { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
 <header>
   <div>
     <strong>Calaveras Job Agent</strong>
+    {% if request.session.get("role", "administrator") != "administrator" %}
+    <span class="user-nav">
     <a href="/">Dashboard</a>
     <a href="/jobs">Jobs</a>
     <a href="/profile">Profile</a>
     <a href="/resumes">Resumes</a>
     <a href="/application-assistant">Application Assistant</a>
     <a href="/onboarding">Getting Started</a>
-    {% if request.session.get("role", "administrator") == "administrator" %}
-    <a href="/admin/analytics">Analytics</a>
-    <a href="/admin/users">Users</a>
-    <a href="/admin/notifications">Notifications</a>
-    <a href="/settings">Settings</a>
-    <a href="/sources">Sources</a>
-    <a href="/runs">Runs</a>
-    <a href="/admin/audit">Audit Log</a>
+    </span>
     {% endif %}
   </div>
   <div>
@@ -65,6 +77,41 @@
     <form class="inline" method="post" action="/logout"><button class="btn secondary">Sign out</button></form>
   </div>
 </header>
-<main>{% block content %}{% endblock %}</main>
+{% set is_admin = request.session.get("role", "administrator") == "administrator" %}
+{% set current_path = request.url.path %}
+<div class="app-shell{% if is_admin %} admin{% endif %}">
+  {% if is_admin %}
+  <aside class="admin-sidebar" aria-label="Administrator navigation">
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Overview</div>
+        <a href="/"{% if current_path == "/" %} class="active" aria-current="page"{% endif %}>Dashboard</a>
+        <a href="/jobs"{% if current_path.startswith("/jobs") %} class="active" aria-current="page"{% endif %}>Jobs</a>
+        <a href="/admin/analytics"{% if current_path.startswith("/admin/analytics") %} class="active" aria-current="page"{% endif %}>Analytics</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Client Management</div>
+        <a href="/admin/users"{% if current_path.startswith("/admin/users") %} class="active" aria-current="page"{% endif %}>Users</a>
+        <a href="/admin/notifications"{% if current_path.startswith("/admin/notifications") %} class="active" aria-current="page"{% endif %}>Notifications</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Operations</div>
+        <a href="/sources"{% if current_path.startswith("/sources") %} class="active" aria-current="page"{% endif %}>Sources</a>
+        <a href="/runs"{% if current_path.startswith("/runs") %} class="active" aria-current="page"{% endif %}>Runs</a>
+        <a href="/settings"{% if current_path.startswith("/settings") %} class="active" aria-current="page"{% endif %}>Settings</a>
+        <a href="/admin/audit"{% if current_path.startswith("/admin/audit") %} class="active" aria-current="page"{% endif %}>Audit Log</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">My Account</div>
+        <a href="/profile"{% if current_path.startswith("/profile") %} class="active" aria-current="page"{% endif %}>Profile</a>
+        <a href="/resumes"{% if current_path.startswith("/resumes") %} class="active" aria-current="page"{% endif %}>Resumes</a>
+        <a href="/application-assistant"{% if current_path.startswith("/application-assistant") %} class="active" aria-current="page"{% endif %}>Application Assistant</a>
+        <a href="/onboarding"{% if current_path.startswith("/onboarding") %} class="active" aria-current="page"{% endif %}>Getting Started</a>
+      </div>
+    </nav>
+  </aside>
+  {% endif %}
+  <main>{% block content %}{% endblock %}</main>
+</div>
 </body>
 </html>
