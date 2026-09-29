@@ -164,6 +164,203 @@ JOB_SOURCES = [
 ]
 
 
+# Countywide employer coverage audit. This is intentionally separate from
+# JOB_SOURCES: a provider can cover several employers, and some employers are
+# useful watch-list candidates even when they do not expose a stable job feed.
+EMPLOYER_COVERAGE = [
+    {
+        "name": "Calaveras County Government",
+        "sector": "Government",
+        "area": "Countywide",
+        "status": "integrated",
+        "method": "Direct NEOGOV provider",
+        "priority": "Covered",
+        "url": "https://www.governmentjobs.com/careers/calaverascounty",
+        "notes": "County departments, public works, sheriff support, health and human services.",
+    },
+    {
+        "name": "City of Angels Camp",
+        "sector": "Government",
+        "area": "Angels Camp",
+        "status": "candidate",
+        "method": "Monitor official HR page",
+        "priority": "High",
+        "url": "https://angelscamp.gov/city-hall/human-resources-2/",
+        "notes": "Official page publishes recruitments only while positions are open.",
+    },
+    {
+        "name": "Calaveras County Superior Court",
+        "sector": "Government",
+        "area": "San Andreas",
+        "status": "candidate",
+        "method": "Monitor official careers page",
+        "priority": "High",
+        "url": "https://www.calaveras.courts.ca.gov/general-information/career-opportunities",
+        "notes": "Separate employer and career page from county government.",
+    },
+    {
+        "name": "California State Parks / Calaveras Big Trees",
+        "sector": "Government",
+        "area": "Arnold",
+        "status": "covered",
+        "method": "CalCareers provider",
+        "priority": "Covered",
+        "url": "https://www.parks.ca.gov/jobs",
+        "notes": "State and seasonal park roles are covered through CalCareers.",
+    },
+    {
+        "name": "Calaveras County Office of Education & Calaveras USD",
+        "sector": "Education",
+        "area": "Countywide",
+        "status": "integrated",
+        "method": "Direct EDJOIN provider",
+        "priority": "Covered",
+        "url": "https://www.edjoin.org/Home/Jobs?countyID=5",
+        "notes": "The current school provider directly monitors these two employers.",
+    },
+    {
+        "name": "Bret Harte Union High School District",
+        "sector": "Education",
+        "area": "Angels Camp",
+        "status": "gap",
+        "method": "Extend EDJOIN provider",
+        "priority": "High",
+        "url": "https://www.edjoin.org/Home/Jobs?countyID=5",
+        "notes": "Official EDJOIN postings are not yet included in the existing school provider.",
+    },
+    {
+        "name": "Mark Twain Union Elementary School District",
+        "sector": "Education",
+        "area": "Angels Camp / Copperopolis",
+        "status": "gap",
+        "method": "Extend EDJOIN provider",
+        "priority": "High",
+        "url": "https://www.edjoin.org/mtwain",
+        "notes": "Official EDJOIN portal exists and is suitable for direct coverage.",
+    },
+    {
+        "name": "Vallecito Union School District",
+        "sector": "Education",
+        "area": "Avery / Murphys / Vallecito",
+        "status": "gap",
+        "method": "Extend EDJOIN provider",
+        "priority": "High",
+        "url": "https://www.edjoin.org/Home/Jobs?countyID=5",
+        "notes": "Major local school employer; add its EDJOIN organization to the provider.",
+    },
+    {
+        "name": "Mark Twain Medical Center / CommonSpirit",
+        "sector": "Healthcare",
+        "area": "San Andreas",
+        "status": "integrated",
+        "method": "Direct CommonSpirit provider",
+        "priority": "Covered",
+        "url": "https://www.commonspirit.careers/",
+        "notes": "Local hospital and related CommonSpirit openings.",
+    },
+    {
+        "name": "MACT Health Board",
+        "sector": "Healthcare",
+        "area": "Angels Camp / San Andreas",
+        "status": "candidate",
+        "method": "Integrate official openings",
+        "priority": "High",
+        "url": "https://www.macthealth.org/careers",
+        "notes": "Official careers page serves multiple foothill clinics, including Calaveras locations.",
+    },
+    {
+        "name": "Calaveras County Water District",
+        "sector": "Utility",
+        "area": "Countywide",
+        "status": "integrated",
+        "method": "Direct employer provider",
+        "priority": "Covered",
+        "url": "https://www.ccwd.org/job-opportunities",
+        "notes": "Official CCWD opportunities are already monitored.",
+    },
+    {
+        "name": "Pacific Gas and Electric",
+        "sector": "Utility",
+        "area": "Countywide / foothills",
+        "status": "integrated",
+        "method": "Direct PG&E provider",
+        "priority": "Covered",
+        "url": "https://jobs.pge.com/",
+        "notes": "Location-filtered utility roles are already monitored.",
+    },
+    {
+        "name": "Bear Valley Mountain Resort",
+        "sector": "Hospitality",
+        "area": "Bear Valley",
+        "status": "integrated",
+        "method": "Direct ADP provider",
+        "priority": "Covered",
+        "url": "https://www.bearvalley.com/employment/",
+        "notes": "Resort and seasonal jobs are already monitored.",
+    },
+    {
+        "name": "WorldMark Angels Camp",
+        "sector": "Hospitality",
+        "area": "Angels Camp",
+        "status": "integrated",
+        "method": "Direct employer provider",
+        "priority": "Covered",
+        "url": "https://careers.travelandleisureco.com/jobs/search?query=Angels+Camp",
+        "notes": "Travel + Leisure Co. openings are already monitored.",
+    },
+    {
+        "name": "Ironstone Vineyards",
+        "sector": "Hospitality / winery",
+        "area": "Murphys",
+        "status": "candidate",
+        "method": "Monitor official employment page",
+        "priority": "High",
+        "url": "https://ironstonevineyards.com/employment/",
+        "notes": "Official page lists openings in page content and supports direct applications.",
+    },
+    {
+        "name": "Greenhorn Creek Resort",
+        "sector": "Hospitality",
+        "area": "Angels Camp",
+        "status": "manual",
+        "method": "Aggregator/manual watch",
+        "priority": "Medium",
+        "url": "https://www.greenhorncreek.com/",
+        "notes": "No stable official careers feed was identified; openings appear on job boards.",
+    },
+    {
+        "name": "Big Trees Market",
+        "sector": "Retail / grocery",
+        "area": "Arnold",
+        "status": "manual",
+        "method": "Aggregator/manual watch",
+        "priority": "Medium",
+        "url": "https://www.bigtreesmarket.com/",
+        "notes": "Major local employer without a verified structured career feed.",
+    },
+    {
+        "name": "Calaveras Lumber",
+        "sector": "Retail / building supply",
+        "area": "Angels Camp",
+        "status": "manual",
+        "method": "Aggregator/manual watch",
+        "priority": "Medium",
+        "url": "https://calaveraslumber.com/",
+        "notes": "Major local employer without a verified structured career feed.",
+    },
+    {
+        "name": "Mar-Val Food Stores",
+        "sector": "Retail / grocery",
+        "area": "Valley Springs",
+        "status": "manual",
+        "method": "Aggregator/manual watch",
+        "priority": "Medium",
+        "url": "https://marvalfoodstores.org/",
+        "notes": "Local store hiring may be advertised in-store or through third-party boards.",
+    },
+]
+
+
 def get_job_sources() -> list[dict]:
     raw = env("JOB_PROVIDERS") or env("JOB_PROVIDER", "demo") or "demo"
     enabled = {name.strip().lower() for name in raw.split(",") if name.strip()}
@@ -174,3 +371,19 @@ def get_job_sources() -> list[dict]:
         item["enabled"] = item["key"] in enabled
         result.append(item)
     return result
+
+
+def get_employer_coverage() -> tuple[list[dict], dict[str, int]]:
+    employers = [dict(item) for item in EMPLOYER_COVERAGE]
+    counts = {
+        "total": len(employers),
+        "automated": sum(
+            item["status"] in {"integrated", "covered"} for item in employers
+        ),
+        "high_priority": sum(
+            item["priority"] == "High" and item["status"] not in {"integrated", "covered"}
+            for item in employers
+        ),
+        "manual": sum(item["status"] == "manual" for item in employers),
+    }
+    return employers, counts
