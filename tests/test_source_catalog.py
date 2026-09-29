@@ -9,7 +9,11 @@ def test_employer_coverage_summary_matches_inventory():
         employer["status"] in {"integrated", "covered"}
         for employer in employers
     )
-    assert summary["high_priority"] > 0
+    assert summary["high_priority"] == sum(
+        employer["priority"] == "High"
+        and employer["status"] not in {"integrated", "covered"}
+        for employer in employers
+    )
     assert summary["manual"] > 0
 
 
