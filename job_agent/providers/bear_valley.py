@@ -23,6 +23,10 @@ class BearValleyProvider(JobProvider):
         "https://workforcenow.adp.com/mascsr/default/mdf/"
         "recruitment/recruitment.html"
     )
+    COMPANY_NAME = "Bear Valley Mountain Resort"
+    SOURCE_KEY = "bear_valley"
+    DEFAULT_LOCATION = "Bear Valley, CA"
+    LOCAL_LOCATION_TERMS = ("bear valley", "calaveras")
 
     def __init__(self) -> None:
         self._cached_jobs: list[RawJob] | None = None
@@ -61,8 +65,7 @@ class BearValleyProvider(JobProvider):
         except ValueError:
             return None
 
-    @staticmethod
-    def _location_text(job: dict) -> str:
+    def _location_text(self, job: dict) -> str:
         locations = job.get("requisitionLocations") or []
 
         for location in locations:
@@ -83,7 +86,7 @@ class BearValleyProvider(JobProvider):
             if name:
                 return name.strip()
 
-        return "Bear Valley, CA"
+        return self.DEFAULT_LOCATION
 
     @staticmethod
     def _salary_text(job: dict) -> str | None:
@@ -258,9 +261,9 @@ class BearValleyProvider(JobProvider):
             # Keep this source strictly local.
             location_low = location.lower()
 
-            if (
-                "bear valley" not in location_low
-                and "calaveras" not in location_low
+            if not any(
+                term in location_low
+                for term in self.LOCAL_LOCATION_TERMS
             ):
                 continue
 
@@ -291,13 +294,13 @@ class BearValleyProvider(JobProvider):
                 RawJob(
                     provider_job_id=job_id,
                     title=title,
-                    company="Bear Valley Mountain Resort",
+                    company=self.COMPANY_NAME,
                     location=location,
                     employment_type=work_level,
                     description=description,
                     posted_at=posted_at,
                     apply_url=apply_url,
-                    source="bear_valley",
+                    source=self.SOURCE_KEY,
                     source_url=apply_url,
                     requirements=[],
                     metadata={
