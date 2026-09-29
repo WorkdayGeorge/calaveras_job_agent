@@ -22,7 +22,7 @@ from job_agent.models import (
     UserSearchTerm, UserJobMatch, AuthToken, UserOnboarding,
 )
 from job_agent.application_builder import build_application_materials
-from job_agent.source_catalog import get_job_sources
+from job_agent.source_catalog import get_employer_coverage, get_job_sources
 from job_agent.config import load_settings, env
 from job_agent.notify import email_notify, email_text, normalize_email_address
 from job_agent.settings_store import (
@@ -2398,10 +2398,15 @@ def sources_page(request: Request):
         return denial
 
     sources = get_job_sources()
+    employers, coverage_summary = get_employer_coverage()
     return templates.TemplateResponse(
         request,
         "sources.html",
-        {"sources": sources},
+        {
+            "sources": sources,
+            "employers": employers,
+            "coverage_summary": coverage_summary,
+        },
     )
 
 
