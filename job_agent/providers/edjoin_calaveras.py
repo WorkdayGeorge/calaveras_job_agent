@@ -17,6 +17,16 @@ class EDJoinCalaverasProvider(JobProvider):
 
     DISTRICTS = [
         {
+            "district_id": 71,
+            "name": "Vallecito Union School District",
+            "portal": "https://www.edjoin.org/vallecito",
+        },
+        {
+            "district_id": 72,
+            "name": "Mark Twain Union Elementary School District",
+            "portal": "https://www.edjoin.org/mtwain",
+        },
+        {
             "district_id": 74,
             "name": "Calaveras County Office Of Education",
             "portal": "https://www.edjoin.org/calaverascoe",
@@ -25,6 +35,11 @@ class EDJoinCalaverasProvider(JobProvider):
             "district_id": 73,
             "name": "Calaveras Unified School District",
             "portal": "https://www.edjoin.org/calaverasusd",
+        },
+        {
+            "district_id": 75,
+            "name": "Bret Harte Union High School District",
+            "portal": "https://www.edjoin.org/bhuhsd",
         },
     ]
 
