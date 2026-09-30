@@ -325,6 +325,7 @@ def send_administrator_job_notifications(
     """Send reviewed job alerts and persist every delivery attempt."""
     counts = {"sent": 0, "failed": 0, "skipped": 0}
     job_payload = {
+        "id": job.id,
         "title": job.title,
         "company": job.company,
         "location": job.location,
@@ -453,6 +454,8 @@ def current_resume_version(session, request: Request) -> str:
 
 def require_auth(request: Request):
     if not authed(request):
+        if request.method == "GET" and request.url.path.startswith("/jobs/"):
+            request.session["return_to"] = request.url.path
         return RedirectResponse("/login", status_code=303)
     if request.session.get("must_change_password") and request.url.path != "/account/change-password":
         return RedirectResponse("/account/change-password", status_code=303)
@@ -597,8 +600,11 @@ def login(request: Request, password: str = Form(...), email: str = Form("")):
                     {"error": "The sign-in code could not be sent. Please contact the administrator.", "database_auth": True},
                     status_code=503,
                 )
+            return_to = request.session.get("return_to")
             request.session.clear()
             request.session["pending_user_id"] = user.id
+            if return_to:
+                request.session["return_to"] = return_to
             return RedirectResponse("/login/verify", status_code=303)
 
     configured = env("ADMIN_PASSWORD", "")
@@ -644,6 +650,7 @@ def verify_login(request: Request, code: str = Form(...)):
         user.updated_at = now
         session.commit()
         record_audit(session, "login_succeeded", actor_user_id=user.id, request=request)
+        return_to = request.session.get("return_to")
         request.session.clear()
         request.session.update({
             "user_id": user.id,
@@ -651,7 +658,11 @@ def verify_login(request: Request, code: str = Form(...)):
             "email": user.email,
             "must_change_password": user.must_change_password,
         })
-        destination = "/account/change-password" if user.must_change_password else "/"
+        destination = (
+            "/account/change-password"
+            if user.must_change_password
+            else return_to or "/"
+        )
         return RedirectResponse(destination, status_code=303)
 
 @app.get("/account/change-password", response_class=HTMLResponse)
