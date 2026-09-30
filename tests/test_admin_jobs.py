@@ -181,6 +181,7 @@ def test_administrator_notifications_require_review_and_prevent_duplicates():
     )
     assert first == {"sent": 1, "failed": 0, "skipped": 0}
     assert len(deliveries) == 1
+    assert deliveries[0][0]["id"] == job.id
     assert session.query(Notification).count() == 1
 
     candidates = administrator_notification_candidates(session, job.id)
