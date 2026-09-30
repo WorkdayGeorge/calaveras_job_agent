@@ -18,6 +18,15 @@ def normalize_email_address(value: str | None) -> str | None:
         return None
     return address
 
+
+def application_prep_url(job: dict) -> str:
+    """Return the in-app preparation page, with a safe legacy fallback."""
+    job_id = str(job.get("id") or "").strip()
+    base_url = str(env("PUBLIC_BASE_URL", "") or "").strip().rstrip("/")
+    if job_id and base_url:
+        return f"{base_url}/jobs/{job_id}/application"
+    return str(job.get("apply_url") or "").strip()
+
 def notification_bucket(job: dict, evaluation: dict, settings: dict) -> str:
     score = int(evaluation["fit_score"])
     fresh = job.get("freshness_status") == "verified_fresh"
@@ -54,8 +63,8 @@ Why:
 Potential gaps:
 {', '.join(evaluation.get('missing_requirements') or []) or 'None identified'}
 
-Apply:
-{job['apply_url']}
+Prepare your application:
+{application_prep_url(job)}
 """
     return subject, body
 
@@ -174,7 +183,7 @@ def email_high_priority_digest(
                 job.get("location") or "Location not supplied",
                 f"Fit: {evaluation['fit_score']}/100 — {evaluation['classification']}",
                 f"Recommendation: {evaluation['recommendation']}",
-                f"Apply: {job['apply_url']}",
+                f"Prepare application: {application_prep_url(job)}",
                 "",
             ])
     else:
@@ -203,7 +212,7 @@ def email_high_priority_digest(
                 f"Fit: {evaluation['fit_score']}/100 — {evaluation['classification']}",
                 f"Recommendation: {evaluation['recommendation']}",
                 f"Evaluated: {evaluation.get('evaluated_at') or 'Date unavailable'}",
-                f"Apply: {job['apply_url']}",
+                f"Prepare application: {application_prep_url(job)}",
                 "",
             ])
     else:
