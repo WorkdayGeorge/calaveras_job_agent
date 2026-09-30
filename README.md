@@ -176,7 +176,9 @@ that page. Apply-recommended users who have not received the opening are
 preselected; successful prior deliveries are protected from duplicates unless
 the administrator explicitly enables a resend. Attempts are recorded in
 Notifications, included in the per-job notified count, and summarized in the
-Audit Log.
+Audit Log. Notification emails link to the user's in-app **Application Prep**
+page for the opening; the original employer application link remains available
+inside that page.
 
 Current uploaded DOCX and PDF resumes provide a **Review & Update Profile**
 action. Resume text is extracted at upload time, combined with the saved profile
