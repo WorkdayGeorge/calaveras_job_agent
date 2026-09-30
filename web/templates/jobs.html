@@ -7,7 +7,7 @@
 {% if administrator_view %}
 <p class="muted">Review current fit and application activity across active users.</p>
 {% else %}
-<p class="muted">Track each opportunity from discovery through application.</p>
+<p class="muted">Track each opportunity from discovery through application. Select Apply to review preparation materials before continuing to the employer's application.</p>
 {% endif %}
 <form method="get" action="/jobs" style="margin-bottom:18px">
   {% if status_filter %}
@@ -70,8 +70,7 @@
 </select><button class="btn secondary" style="margin-top:8px">Save</button></form>
 </td>
 <td>
-  <a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener">Open</a>
-  <a class="btn" href="/jobs/{{ job.id }}/application">Build Resume</a>
+  <a class="btn" href="/jobs/{{ job.id }}/application">Apply</a>
 </td>
 </tr>
 {% else %}<tr><td colspan="6">No jobs stored yet.</td></tr>{% endfor %}
