@@ -8,10 +8,12 @@ body{font-family:system-ui;background:#f5f7fb;display:grid;place-items:center;he
 input{width:100%;padding:12px;border:1px solid #cfd4dc;border-radius:9px;box-sizing:border-box}
 button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:9px;background:#2563eb;color:white;font-weight:700}
 .error{color:#b42318}
+.message{color:#175cd3;background:#eff8ff;border:1px solid #b2ddff;border-radius:9px;padding:10px}
 </style></head>
 <body><div class="card">
 <h1>Calaveras Job Agent</h1><p>Sign in</p>
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if message %}<p class="message">{{ message }}</p>{% endif %}
 <form method="post">
 {% if database_auth %}<input name="email" type="email" placeholder="Email address" autocomplete="username" required style="margin-bottom:10px">{% endif %}
 <input name="password" type="password" placeholder="Password" autocomplete="current-password" required>
