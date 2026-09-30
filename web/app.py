@@ -447,6 +447,17 @@ def get_assigned_job(session, job_id: str, request: Request):
         stmt = stmt.where(assignment)
     return session.scalar(stmt)
 
+
+def inaccessible_job_response(session, job_id: str, request: Request):
+    """Prompt for the intended account when the job exists but access does not."""
+    if session.get(Job, job_id):
+        request.session["return_to"] = f"/jobs/{job_id}/application"
+        return RedirectResponse(
+            "/login?message=Please+sign+in+with+the+account+that+received+this+job+notification.",
+            status_code=303,
+        )
+    return HTMLResponse("Job not found", status_code=404)
+
 def current_resume_version(session, request: Request) -> str:
     user_id = current_user_id(request)
     profile = session.get(CandidateProfile, user_id) if user_id else None
@@ -553,11 +564,15 @@ def health():
     return {"ok": True}
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
+def login_page(request: Request, message: str = ""):
     return templates.TemplateResponse(
         request,
         "login.html",
-        {"error": None, "database_auth": database_auth_enabled()}
+        {
+            "error": None,
+            "message": message.strip() or None,
+            "database_auth": database_auth_enabled(),
+        }
     )
 
 @app.post("/login", response_class=HTMLResponse)
@@ -1403,7 +1418,7 @@ def application_page(job_id: str, request: Request):
     with SessionLocal() as session:
         job = get_assigned_job(session, job_id, request)
         if not job:
-            return HTMLResponse("Job not found", status_code=404)
+            return inaccessible_job_response(session, job_id, request)
 
         package = session.scalar(
             select(ApplicationPackage)
