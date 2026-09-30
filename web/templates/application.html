@@ -28,6 +28,7 @@
   {% endif %}
 </div>
 
+{% if package %}
 <div class="card" style="margin-top:18px;">
   <h2 style="margin-top:0;">Application Tracking</h2>
   <form method="post" action="/jobs/{{ job.id }}/application-status">
@@ -43,6 +44,7 @@
     <button class="btn" style="margin-top:14px">Save application details</button>
   </form>
 </div>
+{% endif %}
 
 {% if not package %}
 <div class="card" style="margin-top:18px;">
