@@ -3,7 +3,11 @@ from types import SimpleNamespace
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from web.app import BrowserSecurityMiddleware, require_admin
+from web.app import (
+    BrowserSecurityMiddleware,
+    inaccessible_job_response,
+    require_admin,
+)
 
 
 def fake_request(session):
@@ -22,6 +26,25 @@ def test_administrator_passes_admin_guard():
     assert require_admin(
         fake_request({"user_id": "admin-1", "role": "administrator"})
     ) is None
+
+
+def test_existing_inaccessible_job_redirects_to_account_login():
+    request = SimpleNamespace(session={})
+    session = SimpleNamespace(get=lambda model, job_id: object())
+    response = inaccessible_job_response(session, "job-123", request)
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/login?message=")
+    assert request.session["return_to"] == "/jobs/job-123/application"
+
+
+def test_missing_job_remains_not_found():
+    request = SimpleNamespace(session={})
+    session = SimpleNamespace(get=lambda model, job_id: None)
+    response = inaccessible_job_response(session, "missing", request)
+
+    assert response.status_code == 404
+    assert "return_to" not in request.session
 
 
 def test_cross_site_post_is_rejected():
