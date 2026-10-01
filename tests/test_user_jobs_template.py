@@ -9,6 +9,9 @@ def test_user_jobs_apply_action_routes_through_application_prep():
     assert 'href="{{ job.apply_url }}" target="_blank" rel="noopener">Open</a>' not in template
     assert '<th>Status</th>' not in template
     assert 'action="/jobs/{{ job.id }}/status"' not in template
+    assert 'name="q" type="search"' in template
+    assert "Job title, employer, or location" in template
+    assert "Clear search" in template
 
 
 def test_administrator_can_still_view_source_job_posting():
