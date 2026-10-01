@@ -17,6 +17,10 @@
   {% if not administrator_view %}
   <label for="q"><span class="muted">Find jobs</span></label>
   <input id="q" name="q" type="search" value="{{ search_query }}" placeholder="Job title, employer, or location">
+  <div style="margin:8px 0 16px">
+    <button class="btn secondary">Search jobs</button>
+    {% if search_query %}<a class="btn secondary" href="/jobs?sort={{ sort_by }}">Clear search</a>{% endif %}
+  </div>
   {% endif %}
 
   <label for="sort"><span class="muted">Sort by</span></label>
@@ -29,8 +33,7 @@
     <option value="title" {% if sort_by == "title" %}selected{% endif %}>Job title A-Z</option>
     <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
   </select>
-  <button class="btn secondary" style="margin-top:8px">{% if administrator_view %}Apply sort{% else %}Search jobs{% endif %}</button>
-  {% if not administrator_view and search_query %}<a class="btn secondary" href="/jobs?sort={{ sort_by }}">Clear search</a>{% endif %}
+  <button class="btn secondary" style="margin-top:8px">Apply sort</button>
 </form>
 <table>
 {% if administrator_view %}
