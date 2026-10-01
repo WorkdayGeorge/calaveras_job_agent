@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Resp
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from sqlalchemy import select, desc, func, and_, case
+from sqlalchemy import select, desc, func, and_, case, or_
 
 from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
@@ -150,6 +150,20 @@ def job_sort_order(sort_by):
         Job.posted_at.is_(None),
         Job.posted_at.desc(),
         Job.first_seen_at.desc(),
+    )
+
+
+def job_search_clause(query: str | None):
+    """Return a literal, case-insensitive title/company/location filter."""
+    value = " ".join(str(query or "").split()).strip()[:100]
+    if not value:
+        return None
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    return or_(
+        Job.title.ilike(pattern, escape="\\"),
+        Job.company.ilike(pattern, escape="\\"),
+        Job.location.ilike(pattern, escape="\\"),
     )
 
 
@@ -1267,6 +1281,7 @@ def jobs_page(
     request: Request,
     status: str | None = None,
     sort: str = "newest_posted",
+    q: str = "",
 ):
     denial = require_auth(request)
     if denial:
@@ -1281,6 +1296,7 @@ def jobs_page(
                     "rows": rows,
                     "status_filter": None,
                     "sort_by": sort,
+                    "search_query": "",
                     "administrator_view": True,
                 },
             )
@@ -1315,6 +1331,9 @@ def jobs_page(
                 stmt = stmt.where(UserJobState.status == status)
             else:
                 stmt = stmt.where(Job.status == status)
+        search_clause = job_search_clause(q)
+        if search_clause is not None:
+            stmt = stmt.where(search_clause)
         rows = session.execute(stmt.limit(250)).all()
     return templates.TemplateResponse(
         request,
@@ -1323,6 +1342,7 @@ def jobs_page(
             "rows": rows,
             "status_filter": status,
             "sort_by": sort,
+            "search_query": " ".join(q.split()).strip()[:100],
             "administrator_view": False,
         }
     )
