@@ -12,6 +12,7 @@ def test_user_jobs_apply_action_routes_through_application_prep():
     assert 'name="q" type="search"' in template
     assert "Job title, employer, or location" in template
     assert "Clear search" in template
+    assert template.index(">Search jobs</button>") < template.index('for="sort"')
 
 
 def test_administrator_can_still_view_source_job_posting():
