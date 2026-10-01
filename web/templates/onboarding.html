@@ -1,5 +1,5 @@
 {% extends "base.html" %}{% block content %}
-<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h1 style="margin-bottom:4px">Getting Started</h1><p class="muted">Complete these steps to begin receiving personalized job matches.</p></div>{% if complete %}<a class="btn good" href="/">Go to Dashboard</a>{% endif %}</div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h1 style="margin-bottom:4px">Getting Started</h1><p class="muted">Complete these steps to begin receiving personalized job matches.</p></div>{% if complete %}<a class="btn good" href="/jobs">Go to Jobs</a>{% endif %}</div>
 {% if existing_user %}<div class="card" style="margin-bottom:18px"><p>This account existed before self-service onboarding. Nothing has been changed or reset.</p></div>{% endif %}
 <div class="grid">
   <div class="card"><span class="pill">1</span><h2>Email and password</h2><p class="{{ 'good' if steps.account or existing_user else 'warn' }}">{{ 'Complete' if steps.account or existing_user else 'Required' }}</p><p class="muted">Your login and email verification protect your account.</p></div>

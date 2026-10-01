@@ -6,7 +6,11 @@ from sqlalchemy.orm import sessionmaker
 
 from job_agent.models import Base, SearchTerm, User, UserOnboarding
 from job_agent.user_search import ensure_user_search_terms
-from web.app import require_admin_or_self
+from web.app import (
+    default_signed_in_destination,
+    require_admin_or_self,
+    user_onboarding_complete,
+)
 from web.auth import consume_token, find_valid_token, hash_password, issue_token
 
 
@@ -83,6 +87,38 @@ def test_existing_users_keep_legacy_search_term_initialization():
 
     assert [term.term for term in terms] == ["Accounting Clerk"]
     assert session.get(UserOnboarding, user.id) is None
+    assert user_onboarding_complete(session, user) is True
+    assert default_signed_in_destination(session, user) == "/jobs"
+
+
+def test_incomplete_onboarding_users_are_sent_to_setup_then_jobs():
+    session = make_session()
+    user = add_user(session, status="onboarding")
+    now = datetime.now(timezone.utc)
+    onboarding = UserOnboarding(
+        user_id=user.id,
+        invited_at=now,
+        invitation_expires_at=now + timedelta(hours=48),
+        updated_at=now,
+    )
+    session.add(onboarding)
+    session.commit()
+
+    assert user_onboarding_complete(session, user) is False
+    assert default_signed_in_destination(session, user) == "/onboarding"
+
+    onboarding.completed_at = now
+    session.commit()
+    assert default_signed_in_destination(session, user) == "/jobs"
+
+
+def test_administrator_keeps_dashboard_destination():
+    session = make_session()
+    user = add_user(session, status="active")
+    user.role = "administrator"
+    session.commit()
+
+    assert default_signed_in_destination(session, user) == "/"
 
 
 def test_users_can_manage_only_their_own_profile():

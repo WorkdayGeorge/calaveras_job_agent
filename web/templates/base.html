@@ -62,12 +62,11 @@
     <strong>Calaveras Job Agent</strong>
     {% if request.session.get("role", "administrator") != "administrator" %}
     <span class="user-nav">
-    <a href="/">Dashboard</a>
     <a href="/jobs">Jobs</a>
     <a href="/profile">Profile</a>
     <a href="/resumes">Resumes</a>
     <a href="/application-assistant">Application Assistant</a>
-    <a href="/onboarding">Getting Started</a>
+    {% if request.session.get("onboarding_complete") is sameas false %}<a href="/onboarding">Getting Started</a>{% endif %}
     </span>
     {% endif %}
   </div>
