@@ -504,6 +504,18 @@ def require_admin_or_self(request: Request, user_id: str):
     return None
 
 
+def user_onboarding_complete(session, user: User) -> bool:
+    """Existing users and users with completed onboarding are fully set up."""
+    onboarding = session.get(UserOnboarding, user.id)
+    return onboarding is None or onboarding.completed_at is not None
+
+
+def default_signed_in_destination(session, user: User) -> str:
+    if user.role == "administrator":
+        return "/"
+    return "/jobs" if user_onboarding_complete(session, user) else "/onboarding"
+
+
 def bearer_token(request: Request) -> str | None:
     authorization = request.headers.get("authorization", "")
     scheme, _, value = authorization.partition(" ")
@@ -686,11 +698,13 @@ def verify_login(request: Request, code: str = Form(...)):
             "role": user.role,
             "email": user.email,
             "must_change_password": user.must_change_password,
+            "onboarding_complete": user_onboarding_complete(session, user),
         })
+        default_destination = default_signed_in_destination(session, user)
         destination = (
             "/account/change-password"
             if user.must_change_password
-            else return_to or "/"
+            else return_to or default_destination
         )
         return RedirectResponse(destination, status_code=303)
 
@@ -901,6 +915,7 @@ def verify_onboarding(request: Request, code: str = Form(...)):
             "role": user.role,
             "email": user.email,
             "must_change_password": False,
+            "onboarding_complete": False,
         })
     return RedirectResponse("/onboarding", status_code=303)
 
@@ -970,6 +985,9 @@ def onboarding_page(request: Request):
                 target_user_id=user.id,
                 request=request,
             )
+        if complete:
+            request.session["onboarding_complete"] = True
+            return RedirectResponse("/jobs", status_code=303)
     return templates.TemplateResponse(request, "onboarding.html", {
         "user": user,
         "steps": steps,
@@ -987,6 +1005,16 @@ def dashboard(request: Request, sort: str = "newest_posted"):
     denial = require_auth(request)
     if denial:
         return denial
+
+    if not admin_user(request):
+        with SessionLocal() as session:
+            user = session.get(User, current_user_id(request))
+            if not user:
+                return HTMLResponse("User not found", status_code=404)
+            return RedirectResponse(
+                default_signed_in_destination(session, user),
+                status_code=303,
+            )
 
     with SessionLocal() as session:
         resume_version = current_resume_version(session, request)
