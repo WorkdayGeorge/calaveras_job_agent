@@ -14,6 +14,11 @@
   <input type="hidden" name="status" value="{{ status_filter }}">
   {% endif %}
 
+  {% if not administrator_view %}
+  <label for="q"><span class="muted">Find jobs</span></label>
+  <input id="q" name="q" type="search" value="{{ search_query }}" placeholder="Job title, employer, or location">
+  {% endif %}
+
   <label for="sort"><span class="muted">Sort by</span></label>
   <select id="sort" name="sort">
     <option value="newest_posted" {% if sort_by == "newest_posted" %}selected{% endif %}>Newest posting</option>
@@ -24,7 +29,8 @@
     <option value="title" {% if sort_by == "title" %}selected{% endif %}>Job title A-Z</option>
     <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
   </select>
-  <button class="btn secondary" style="margin-top:8px">Apply sort</button>
+  <button class="btn secondary" style="margin-top:8px">{% if administrator_view %}Apply sort{% else %}Search jobs{% endif %}</button>
+  {% if not administrator_view and search_query %}<a class="btn secondary" href="/jobs?sort={{ sort_by }}">Clear search</a>{% endif %}
 </form>
 <table>
 {% if administrator_view %}
@@ -65,7 +71,7 @@
   <a class="btn" href="/jobs/{{ job.id }}/application">Apply</a>
 </td>
 </tr>
-{% else %}<tr><td colspan="5">No jobs stored yet.</td></tr>{% endfor %}
+{% else %}<tr><td colspan="5">{% if search_query %}No jobs match “{{ search_query }}”.{% else %}No jobs stored yet.{% endif %}</td></tr>{% endfor %}
 {% endif %}
 </table>
 {% endblock %}
