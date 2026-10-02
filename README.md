@@ -227,6 +227,12 @@ public U.S. Forest Service (`AG11`) openings within 75 miles of Sonora. Configur
 through environment variables or Secret Manager. Midnight/date-only publication
 values remain unverified rather than being treated as exact posting times.
 
+The `remotive` provider uses Remotive's public API for remote jobs. It keeps
+only listings whose stated candidate location includes California, the United
+States, North America, or worldwide applicants. Search terms are applied
+locally because the public feed does not reliably filter its response. No API
+key is required, and application links retain Remotive attribution.
+
 Multiple providers can be enabled with the comma-separated `JOB_PROVIDERS`
 environment variable. Local direct-employer keys include `angels_camp`,
 `calaveras_court`, `mact_health`, and `ironstone`. The MACT provider uses its
