@@ -13,6 +13,18 @@ JOB_SOURCES = [
         ],
     },
     {
+        "key": "remotive",
+        "name": "Remotive",
+        "type": "Remote job aggregator",
+        "description": (
+            "Remote openings filtered to positions that accept applicants "
+            "living in California."
+        ),
+        "links": [
+            {"label": "Remotive Remote Jobs", "url": "https://remotive.com/remote-jobs"}
+        ],
+    },
+    {
         "key": "calaveras_county",
         "name": "Calaveras County Government Jobs",
         "type": "Local government",
