@@ -6,11 +6,12 @@ from .config import env
 from .evaluator import load_candidate_profile
 
 APPLICATION_BUILDER_PROMPT = """
-You create truthful, job-specific application materials for the candidate in
-candidate_profile.
+You create truthful, job-specific application materials for the candidate using
+candidate_profile and candidate_resume_text.
 
-Use ONLY facts present in candidate_profile. You may reorder, shorten, rephrase,
-and emphasize supported experience, but you must never invent or exaggerate.
+Use ONLY facts present in candidate_profile or candidate_resume_text. You may
+reorder, shorten, rephrase, and emphasize supported experience, but you must
+never invent or exaggerate.
 
 Hard truth rules:
 - Obey every item in candidate_profile.truth_constraints.
@@ -22,6 +23,10 @@ Hard truth rules:
   responsibilities, education, or achievements.
 - If a job requirement is unsupported, do not imply Joshua has it.
 - Tailor by emphasizing genuine transferable skills and relevant supported experience.
+- Identify important ATS keywords and phrases in the job description and requirements.
+- Naturally incorporate those keywords only when candidate_profile or candidate_resume_text supports them.
+- Never add an unsupported keyword as a claimed skill, credential, or experience.
+- Avoid keyword stuffing; use exact employer terminology where truthful and readable.
 
 Return ONLY valid JSON with exactly these top-level keys:
 {
@@ -94,7 +99,11 @@ def _validate_result(result: dict) -> dict:
     result["truth_check_notes"] = [str(n).strip() for n in notes if str(n).strip()]
     return result
 
-def build_application_materials(job: dict, profile: dict | None = None) -> dict:
+def build_application_materials(
+    job: dict,
+    profile: dict | None = None,
+    resume_text: str | None = None,
+) -> dict:
     api_key = env("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured.")
@@ -116,6 +125,7 @@ def build_application_materials(job: dict, profile: dict | None = None) -> dict:
             "source": job.get("source"),
         },
         "candidate_profile": profile,
+        "candidate_resume_text": resume_text or "",
     }
 
     response = client.responses.create(

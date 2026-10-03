@@ -1516,7 +1516,13 @@ def expand_job_description(job_id: str, request: Request):
         try:
             description = fetch_job_description(job.apply_url)
         except (JobDetailError, requests.RequestException) as exc:
-            message = f"Complete details could not be loaded: {exc}"
+            if "too long" in str(exc).lower():
+                message = (
+                    "Details could not be loaded within 20 seconds. Open the job "
+                    "posting, copy its description and requirements, and paste them below."
+                )
+            else:
+                message = f"Complete details could not be loaded: {exc} Paste the posting details below."
         else:
             if len(description) > len(job.description or ""):
                 job.description = description
@@ -1569,6 +1575,52 @@ def save_application_status(
     return RedirectResponse(f"/jobs/{job_id}/application", status_code=303)
 
 
+@app.post("/jobs/{job_id}/description/manual")
+def save_manual_job_description(
+    job_id: str,
+    request: Request,
+    posting_details: str = Form(...),
+):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    user_id = current_user_id(request)
+    if not user_id:
+        return HTMLResponse("Account ownership is required", status_code=409)
+
+    details = posting_details.strip()
+    if len(details) < 100:
+        message = "Paste at least 100 characters of job posting details."
+    elif len(details) > 100_000:
+        message = "Posting details must be 100,000 characters or fewer."
+    else:
+        with SessionLocal() as session:
+            job = get_assigned_job(session, job_id, request)
+            if not job:
+                return inaccessible_job_response(session, job_id, request)
+            state = get_or_create_job_state(session, user_id, job)
+            state.manual_job_description = details
+            state.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            destination = request.url_for("application_page", job_id=job.id)
+        return RedirectResponse(
+            destination.include_query_params(
+                message="Posting details saved and will be used for application tailoring."
+            ),
+            status_code=303,
+        )
+
+    with SessionLocal() as session:
+        job = get_assigned_job(session, job_id, request)
+        if not job:
+            return inaccessible_job_response(session, job_id, request)
+        destination = request.url_for("application_page", job_id=job.id)
+    return RedirectResponse(
+        destination.include_query_params(message=message),
+        status_code=303,
+    )
+
+
 
 @app.post("/jobs/{job_id}/application/build")
 def build_application_package(job_id: str, request: Request):
@@ -1591,12 +1643,34 @@ def build_application_package(job_id: str, request: Request):
                 status_code=409,
             )
 
+        state = session.scalar(
+            select(UserJobState).where(
+                UserJobState.user_id == current_user_id(request),
+                UserJobState.job_id == job_id,
+            )
+        ) if current_user_id(request) else None
+        effective_description = (
+            state.manual_job_description
+            if state and state.manual_job_description
+            else job.description
+        )
+        resume_asset = session.scalar(
+            select(ResumeAsset)
+            .where(
+                ResumeAsset.user_id == current_user_id(request),
+                ResumeAsset.resume_type == "all-work-experience",
+                ResumeAsset.is_current.is_(True),
+            )
+            .order_by(desc(ResumeAsset.uploaded_at))
+            .limit(1)
+        ) if current_user_id(request) else None
+
         job_data = {
             "title": job.title,
             "company": job.company,
             "location": job.location,
             "employment_type": job.employment_type,
-            "description": job.description,
+            "description": effective_description,
             "requirements": job.requirements or [],
             "source": job.source,
         }
@@ -1605,6 +1679,7 @@ def build_application_package(job_id: str, request: Request):
             result = build_application_materials(
                 job_data,
                 profile=candidate_profile.profile_data,
+                resume_text=resume_asset.extracted_text if resume_asset else None,
             )
         except Exception:
             return HTMLResponse(
@@ -1629,7 +1704,7 @@ def build_application_package(job_id: str, request: Request):
             tailored_resume=result["tailored_resume"],
             cover_letter=result["cover_letter"],
             interview_questions=result["interview_questions"],
-            job_description_snapshot=job.description,
+            job_description_snapshot=effective_description,
             generation_model=env("OPENAI_MODEL", "gpt-5.6-luna"),
             truth_check_notes=result["truth_check_notes"],
             created_at=now,

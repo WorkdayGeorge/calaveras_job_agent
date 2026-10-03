@@ -23,5 +23,9 @@ def test_application_prep_shows_full_job_details():
     assert '<script src="/static/application-details.js" defer></script>' in template
 
     script = Path("web/static/application-details.js").read_text()
+    assert 'button.textContent = "Loading Details…"' not in script
     assert 'completeDetailsButton.textContent = "Loading Details…"' in script
     assert 'window.addEventListener("pageshow", resetCompleteDetailsButton)' in script
+    assert "Paste Complete Posting Details" in template
+    assert 'action="/jobs/{{ job.id }}/description/manual"' in template
+    assert "state.manual_job_description" in template

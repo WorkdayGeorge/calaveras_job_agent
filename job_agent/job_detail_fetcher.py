@@ -12,7 +12,7 @@ from lxml import html as lxml_html
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_DESCRIPTION_CHARS = 100_000
 MAX_REDIRECTS = 3
-TOTAL_TIMEOUT_SECONDS = 25
+TOTAL_TIMEOUT_SECONDS = 20
 
 
 class JobDetailError(ValueError):
