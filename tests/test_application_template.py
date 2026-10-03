@@ -35,3 +35,4 @@ def test_application_prep_shows_full_job_details():
     assert "COMPLETE_DETAILS_TIMEOUT_MS = 20000" in script
     assert "controller.abort()" in script
     assert "manualDetailsSection.hidden = false" in script
+    assert "completeDetailsForm.hidden = true" in script
