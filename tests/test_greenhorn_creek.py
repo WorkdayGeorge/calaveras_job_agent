@@ -46,6 +46,28 @@ def test_greenhorn_maps_harri_job_and_skips_expired(monkeypatch):
     assert jobs[0].source == "greenhorn_creek"
 
 
+def test_greenhorn_uses_sitemap_when_company_page_is_dynamic(monkeypatch):
+    provider = GreenhornCreekProvider()
+    sitemap = '''<urlset>
+      <url><loc>https://harri.com/Yad-BmDiBaycxfQT/job/2707158-line-cook</loc></url>
+      <url><loc>https://harri.com/AnotherEmployer/job/999-other-job</loc></url>
+    </urlset>'''
+    posting = {"@type": "JobPosting", "title": "Line Cook"}
+
+    def get(url, **kwargs):
+        if url == provider.COMPANY_URL:
+            return Response("<html><body>JavaScript application</body></html>")
+        if url == provider.SITEMAP_URL:
+            return Response(sitemap)
+        return Response(
+            f'<script type="application/ld+json">{json.dumps(posting)}</script>'
+        )
+
+    monkeypatch.setattr(provider.session, "get", get)
+    jobs = provider.search(role="", location="")
+    assert [job.provider_job_id for job in jobs] == ["2707158"]
+
+
 def test_greenhorn_deduplicates_company_links(monkeypatch):
     company = '''
       <a href="/Yad-BmDiBaycxfQT/job/2707158-line-cook">details</a>

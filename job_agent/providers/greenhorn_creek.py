@@ -88,6 +88,7 @@ class GreenhornCreekProvider(JobProvider):
     """Greenhorn Creek Resort openings from its Harri employer page."""
 
     COMPANY_URL = "https://harri.com/Yad-BmDiBaycxfQT"
+    SITEMAP_URL = "https://harri.com/sitemap.xml"
     SOURCE_KEY = "greenhorn_creek"
 
     def __init__(self) -> None:
@@ -104,12 +105,25 @@ class GreenhornCreekProvider(JobProvider):
         parser.feed(response.text)
         return (parser.postings[0] if parser.postings else {}, response.text)
 
+    def _sitemap_links(self) -> list[str]:
+        """Use Harri's public sitemap when the Angular page has no static links."""
+        response = self.session.get(self.SITEMAP_URL, timeout=30)
+        response.raise_for_status()
+        locations = [
+            html.unescape(value).strip()
+            for value in re.findall(r"<loc>(.*?)</loc>", response.text, re.I | re.S)
+        ]
+        prefix = f"{self.COMPANY_URL}/job/"
+        return [url for url in locations if url.startswith(prefix)]
+
     def _load_jobs(self) -> list[RawJob]:
         response = self.session.get(self.COMPANY_URL, timeout=30)
         response.raise_for_status()
         parser = _HarriParser()
         parser.feed(response.text)
         urls = list(dict.fromkeys(urljoin(self.COMPANY_URL, href) for href in parser.links))
+        if not urls:
+            urls = list(dict.fromkeys(self._sitemap_links()))
         jobs: list[RawJob] = []
 
         for url in urls:
