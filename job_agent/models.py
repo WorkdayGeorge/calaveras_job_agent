@@ -86,6 +86,7 @@ class Job(Base):
     location: Mapped[str | None] = mapped_column(Text)
     employment_type: Mapped[str | None] = mapped_column(String(100))
     description: Mapped[str | None] = mapped_column(Text)
+    description_expanded: Mapped[bool] = mapped_column(Boolean, default=False)
     requirements: Mapped[list] = mapped_column(JSON, default=list)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     posted_time_confidence: Mapped[str] = mapped_column(String(50), default="unverified")
