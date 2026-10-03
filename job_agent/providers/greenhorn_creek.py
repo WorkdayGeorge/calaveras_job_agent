@@ -109,12 +109,36 @@ class GreenhornCreekProvider(JobProvider):
         """Use Harri's public sitemap when the Angular page has no static links."""
         response = self.session.get(self.SITEMAP_URL, timeout=30)
         response.raise_for_status()
-        locations = [
+        locations = self._locations(response.text)
+        jobs = self._greenhorn_urls(locations)
+        if jobs:
+            return jobs
+
+        # Some sitemap endpoints are indexes. Inspect their child maps, but
+        # keep the request count bounded so a platform change cannot fan out.
+        for sitemap_url in [url for url in locations if url.endswith(".xml")][:25]:
+            try:
+                child = self.session.get(sitemap_url, timeout=30)
+                child.raise_for_status()
+            except requests.RequestException:
+                continue
+            jobs.extend(self._greenhorn_urls(self._locations(child.text)))
+        return list(dict.fromkeys(jobs))
+
+    @staticmethod
+    def _locations(body: str) -> list[str]:
+        return [
             html.unescape(value).strip()
-            for value in re.findall(r"<loc>(.*?)</loc>", response.text, re.I | re.S)
+            for value in re.findall(r"<loc>(.*?)</loc>", body, re.I | re.S)
         ]
-        prefix = f"{self.COMPANY_URL}/job/"
-        return [url for url in locations if url.startswith(prefix)]
+
+    @staticmethod
+    def _greenhorn_urls(locations: list[str]) -> list[str]:
+        pattern = re.compile(
+            r"^https://(?:www\.)?harri\.com/Yad-BmDiBaycxfQT/job/\d+[-/]",
+            re.I,
+        )
+        return [url for url in locations if pattern.search(url)]
 
     def _load_jobs(self) -> list[RawJob]:
         response = self.session.get(self.COMPANY_URL, timeout=30)
