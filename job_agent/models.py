@@ -169,8 +169,8 @@ class ResumeAsset(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    # focused and all-work-experience are application resumes. A
-    # linkedin-profile asset is a profile-update source only.
+    # all-work-experience is the single supported resume type. Legacy rows may
+    # contain focused or linkedin-profile until the cleanup task removes them.
     resume_type: Mapped[str] = mapped_column(String(50), nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_uri: Mapped[str] = mapped_column(Text, nullable=False)
