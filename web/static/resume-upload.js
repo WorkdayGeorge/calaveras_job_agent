@@ -10,3 +10,12 @@ if (resumeUploadForm) {
     button.setAttribute("aria-busy", "true");
   });
 }
+
+document.querySelectorAll(".profile-review-form").forEach(function (form) {
+  form.addEventListener("submit", function () {
+    const button = form.querySelector(".profile-review-button");
+    button.disabled = true;
+    button.textContent = "Preparing Review…";
+    button.setAttribute("aria-busy", "true");
+  });
+});
