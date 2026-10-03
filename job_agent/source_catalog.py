@@ -260,6 +260,15 @@ JOB_SOURCES = [
             {"label": "Ironstone Employment", "url": "https://ironstonevineyards.com/employment/"}
         ],
     },
+    {
+        "key": "greenhorn_creek",
+        "name": "Greenhorn Creek Resort",
+        "type": "Hospitality / golf resort",
+        "description": "Greenhorn Creek Resort openings in Angels Camp hosted by Harri.",
+        "links": [
+            {"label": "Greenhorn Creek Careers", "url": "https://harri.com/Yad-BmDiBaycxfQT"}
+        ],
+    },
 ]
 
 
@@ -421,11 +430,11 @@ EMPLOYER_COVERAGE = [
         "name": "Greenhorn Creek Resort",
         "sector": "Hospitality",
         "area": "Angels Camp",
-        "status": "manual",
-        "method": "Aggregator/manual watch",
-        "priority": "Medium",
-        "url": "https://www.greenhorncreek.com/",
-        "notes": "No stable official careers feed was identified; openings appear on job boards.",
+        "status": "integrated",
+        "method": "Direct Harri employer-page provider",
+        "priority": "Covered",
+        "url": "https://harri.com/Yad-BmDiBaycxfQT",
+        "notes": "Harri openings are monitored directly; expired postings are excluded.",
     },
     {
         "name": "Big Trees Market",
