@@ -73,8 +73,6 @@
   {% for _ in range(2) %}<div class="row"><div><label>New program or training</label><input name="education_name"></div><div><label>Provider</label><input name="education_provider"></div><div><label>Details, dates, and status</label><textarea name="education_status" rows="3"></textarea></div></div>{% endfor %}
 </div>
 
-<div class="card" style="margin-top:18px"><h2 style="margin-top:0">Resume selection</h2><div class="row"><div><label>Use focused resume for</label><textarea name="focused_rules" rows="7">{{ profile_data.resume_selection_rules.focused|join('\n') }}</textarea></div><div><label>Use all-work-experience resume for</label><textarea name="all_work_rules" rows="7">{{ profile_data.resume_selection_rules.all_work_experience|join('\n') }}</textarea></div></div></div>
-
 <div class="card" style="margin-top:18px"><h2 style="margin-top:0">Truth constraints</h2><p class="muted">These rules prevent unsupported claims. Enter one rule per line.</p><textarea name="truth_constraints" rows="7">{{ profile_data.truth_constraints|join('\n') }}</textarea></div>
 
 <div class="card" style="margin-top:18px">
