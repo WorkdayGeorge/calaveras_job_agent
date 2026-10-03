@@ -33,7 +33,7 @@ Return JSON only with:
   "fit_score": integer 0-100,
   "classification": "Strong Fit" | "Possible Fit" | "Poor Fit",
   "recommendation": "Apply" | "Review" | "Skip",
-  "selected_resume": "focused" | "all-work-experience",
+  "selected_resume": "all-work-experience",
   "matching_skills": [string],
   "transferable_skills": [string],
   "missing_requirements": [string],
@@ -51,8 +51,5 @@ Return JSON only with:
 }
 
 Resume-selection rule:
-- Prefer "focused" for accounting, bookkeeping, AP/AR, payroll, administrative,
-  data-entry, and office roles.
-- Prefer "all-work-experience" for warehouse, inventory, shipping/receiving,
-  operations, training, general labor, and IT-support roles.
+- Always return "all-work-experience". It is the single supported resume type.
 """
