@@ -6,7 +6,7 @@ import socket
 from urllib.parse import urljoin, urlsplit
 
 import requests
-from bs4 import BeautifulSoup
+from lxml import html as lxml_html
 
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_DESCRIPTION_CHARS = 100_000
@@ -38,7 +38,14 @@ def _validate_public_url(url: str) -> str:
     return url
 
 
-def _description_from_json_ld(soup: BeautifulSoup) -> str:
+def _plain_text(fragment: str) -> str:
+    try:
+        return lxml_html.fromstring(fragment).text_content().strip()
+    except (ValueError, TypeError):
+        return str(fragment).strip()
+
+
+def _description_from_json_ld(document) -> str:
     def candidates(value):
         if isinstance(value, list):
             for item in value:
@@ -50,35 +57,38 @@ def _description_from_json_ld(soup: BeautifulSoup) -> str:
                 if isinstance(item, (dict, list)):
                     yield from candidates(item)
 
-    for script in soup.find_all("script", type="application/ld+json"):
+    for script in document.xpath('//script[@type="application/ld+json"]'):
         try:
-            payload = json.loads(script.string or script.get_text())
+            payload = json.loads(script.text or "")
         except (TypeError, json.JSONDecodeError):
             continue
         for description in candidates(payload):
-            text = BeautifulSoup(str(description), "html.parser").get_text("\n", strip=True)
+            text = _plain_text(str(description))
             if len(text) >= 200:
                 return text
     return ""
 
 
 def extract_job_description(html: str) -> str:
-    soup = BeautifulSoup(html, "html.parser")
-    text = _description_from_json_ld(soup)
+    try:
+        document = lxml_html.fromstring(html)
+    except (ValueError, TypeError) as exc:
+        raise JobDetailError("The employer posting contained invalid HTML.") from exc
+    text = _description_from_json_ld(document)
     if not text:
         selectors = (
-            '[data-automation-id="jobPostingDescription"]',
-            '[data-testid="job-description"]',
-            "#job-description",
-            ".job-description",
-            ".jobDescription",
-            "article",
-            "main",
+            '//*[@data-automation-id="jobPostingDescription"]',
+            '//*[@data-testid="job-description"]',
+            '//*[@id="job-description"]',
+            '//*[contains(concat(" ", normalize-space(@class), " "), " job-description ")]',
+            '//*[contains(concat(" ", normalize-space(@class), " "), " jobDescription ")]',
+            "//article",
+            "//main",
         )
         for selector in selectors:
-            element = soup.select_one(selector)
-            if element:
-                candidate = element.get_text("\n", strip=True)
+            elements = document.xpath(selector)
+            if elements:
+                candidate = elements[0].text_content().strip()
                 if len(candidate) >= 200:
                     text = candidate
                     break
