@@ -6,7 +6,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
@@ -2708,12 +2708,25 @@ async def upload_resume(
                     detail={"resume_asset_id": asset.id, "error": term_error},
                 )
     if term_error:
-        message = "Document+uploaded;+search-term+generation+could+not+be+completed;+review+the+suggested+profile"
+        message = (
+            "Document uploaded; search-term generation could not be completed; "
+            "review the suggested profile"
+        )
     elif added_terms:
-        message = f"Document+uploaded;+{len(added_terms)}+new+search+terms+added;+review+the+suggested+profile"
+        message = (
+            f"Document uploaded; {len(added_terms)} new search terms added; "
+            "review the suggested profile"
+        )
     else:
-        message = "Document+uploaded;+existing+search+terms+kept;+review+the+suggested+profile"
+        message = (
+            "Document uploaded; existing search terms kept; "
+            "review the suggested profile"
+        )
+    redirect_query = urlencode({
+        "user_id": str(target_user_id),
+        "message": message,
+    })
     return RedirectResponse(
-        f"/resumes?user_id={target_user_id}&message={message}",
+        f"/resumes?{redirect_query}",
         status_code=303,
     )
