@@ -8,14 +8,22 @@
 {% endif %}
 <div class="card">
 <p>Upload the user's complete work-history resume. Every upload is designated <strong>All Work Experience</strong>. New job-search phrases are generated and added without replacing existing terms.</p>
-<form method="post" action="/resumes/upload" enctype="multipart/form-data">
+<form id="resume-upload-form" method="post" action="/resumes/upload" enctype="multipart/form-data">
 <input type="hidden" name="user_id" value="{{ selected_user_id or '' }}">
 <div class="row">
 <div><label>Resume type</label><input value="All Work Experience" disabled></div>
 <div><label>DOCX or PDF</label><input type="file" name="resume" accept=".docx,.pdf" required></div>
-<div style="flex:0 0 auto"><button class="btn">Upload</button></div>
+<div style="flex:0 0 auto"><button id="resume-upload-button" class="btn" type="submit">Upload</button></div>
 </div>
 </form>
+<script>
+document.getElementById("resume-upload-form").addEventListener("submit", function () {
+  const button = document.getElementById("resume-upload-button");
+  button.disabled = true;
+  button.textContent = "Uploading…";
+  button.setAttribute("aria-busy", "true");
+});
+</script>
 </div>
 <h2>Uploaded profile sources</h2>
 <table>
