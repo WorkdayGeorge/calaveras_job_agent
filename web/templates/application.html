@@ -16,15 +16,27 @@
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0;">Job</h2>
+  <h2 style="margin-top:0;">Full Job Description</h2>
   <strong>{{ job.title }}</strong><br>
   <span>{{ job.company }}</span>
   {% if job.location %}
     <div class="muted" style="margin-top:4px;">{{ job.location }}</div>
   {% endif %}
+  <div class="muted" style="margin-top:8px;">
+    {% if job.employment_type %}{{ job.employment_type }}{% endif %}
+    {% if job.posted_at %}{% if job.employment_type %} &mdash; {% endif %}Posted {{ job.posted_at|pacific_time }}{% endif %}
+    {% if job.source %}{% if job.employment_type or job.posted_at %} &mdash; {% endif %}Source: {{ job.source|replace('_', ' ')|title }}{% endif %}
+  </div>
   {% if job.description %}
-    <h3>Job Description</h3>
-    <div style="white-space:pre-wrap;">{{ job.description }}</div>
+    <div style="white-space:pre-wrap; line-height:1.6; margin-top:18px;">{{ job.description }}</div>
+  {% else %}
+    <p class="muted" style="margin-top:18px;">A complete description was not supplied by this job source. Use Open Job Posting to review the employer's listing.</p>
+  {% endif %}
+  {% if job.requirements %}
+    <h3>Requirements and Qualifications</h3>
+    <ul>
+      {% for requirement in job.requirements %}<li style="margin-bottom:8px;">{{ requirement }}</li>{% endfor %}
+    </ul>
   {% endif %}
 </div>
 
