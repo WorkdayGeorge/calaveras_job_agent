@@ -18,3 +18,6 @@ def test_application_prep_shows_full_job_details():
     assert "Requirements and Qualifications" in template
     assert "{% for requirement in job.requirements %}" in template
     assert "A complete description was not supplied" in template
+    assert "Show Complete Details" in template
+    assert 'action="/jobs/{{ job.id }}/description/expand"' in template
+    assert '<script src="/static/application-details.js" defer></script>' in template

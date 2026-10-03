@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import requests
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -41,6 +42,7 @@ from job_agent.profile_store import (
 )
 from job_agent.profile_extractor import propose_profile_from_resume
 from job_agent.resume_search_terms import propose_search_terms_from_resume
+from job_agent.job_detail_fetcher import JobDetailError, fetch_job_description
 from job_agent.analytics import build_admin_analytics, resolve_date_range
 from job_agent.preflight import production_readiness
 from job_agent.backfill import backfill_progress, request_backfill
@@ -1499,6 +1501,32 @@ def application_page(job_id: str, request: Request):
         "application.html",
         {"job": job, "package": package, "state": state}
     )
+
+
+@app.post("/jobs/{job_id}/description/expand")
+def expand_job_description(job_id: str, request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+
+    with SessionLocal() as session:
+        job = get_assigned_job(session, job_id, request)
+        if not job:
+            return inaccessible_job_response(session, job_id, request)
+        try:
+            description = fetch_job_description(job.apply_url)
+        except (JobDetailError, requests.RequestException) as exc:
+            message = f"Complete details could not be loaded: {exc}"
+        else:
+            if len(description) > len(job.description or ""):
+                job.description = description
+                session.commit()
+                message = "Complete job details loaded."
+            else:
+                message = "The employer posting did not contain additional description text."
+        destination = request.url_for("application_page", job_id=job.id)
+        destination = destination.include_query_params(message=message)
+    return RedirectResponse(destination, status_code=303)
 
 
 @app.post("/jobs/{job_id}/application-status")
