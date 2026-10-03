@@ -43,6 +43,7 @@
   <form id="complete-details-form" method="post" action="/jobs/{{ job.id }}/description/expand" style="margin-top:18px;">
     <button id="complete-details-button" class="btn secondary" type="submit">Show Complete Details</button>
   </form>
+  {% if show_manual_details %}
   <h3 style="margin-top:24px;">Paste Complete Posting Details</h3>
   <p class="muted">If complete details cannot be loaded within 20 seconds, open the job posting, copy its description and requirements, and paste them below. Saved details will be used to tailor the application package.</p>
   <form method="post" action="/jobs/{{ job.id }}/description/manual">
@@ -50,6 +51,7 @@
     <textarea id="posting-details" name="posting_details" rows="12" maxlength="100000" required placeholder="Paste the complete job posting here...">{{ state.manual_job_description if state and state.manual_job_description else '' }}</textarea>
     <button class="btn secondary" type="submit" style="margin-top:12px;">Save Posting Details</button>
   </form>
+  {% endif %}
 </div>
 
 {% if package %}
@@ -70,13 +72,13 @@
 </div>
 {% endif %}
 
-{% if not package %}
+{% if not package and details_ready %}
 <div class="card" style="margin-top:18px;">
   <h2 style="margin-top:0;">Application Package</h2>
   <p class="muted">No tailored application package has been generated for this job yet.</p>
   <form method="post" action="/jobs/{{ job.id }}/application/build"><button class="btn good" type="submit">Generate Application Package</button></form>
 </div>
-{% else %}
+{% elif package %}
 <div class="card" style="margin-top:18px;">
   <form method="post" action="/jobs/{{ job.id }}/application/build" style="margin-bottom:12px;"><button class="btn good" type="submit">Regenerate / New Version</button></form>
   <h2 style="margin-top:0;">Tailored Resume</h2>

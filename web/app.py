@@ -1495,11 +1495,22 @@ def application_page(job_id: str, request: Request):
                 UserJobState.job_id == job_id,
             )
         ) if current_user_id(request) else None
+        details_ready = bool(
+            job.description_expanded
+            or (state and state.manual_job_description)
+        )
+        show_manual_details = request.query_params.get("manual") == "1"
 
     return templates.TemplateResponse(
         request,
         "application.html",
-        {"job": job, "package": package, "state": state}
+        {
+            "job": job,
+            "package": package,
+            "state": state,
+            "details_ready": details_ready,
+            "show_manual_details": show_manual_details,
+        }
     )
 
 
@@ -1523,15 +1534,22 @@ def expand_job_description(job_id: str, request: Request):
                 )
             else:
                 message = f"Complete details could not be loaded: {exc} Paste the posting details below."
+            show_manual = True
         else:
             if len(description) > len(job.description or ""):
                 job.description = description
+                job.description_expanded = True
                 session.commit()
                 message = "Complete job details loaded."
+                show_manual = False
             else:
                 message = "The employer posting did not contain additional description text."
+                show_manual = True
         destination = request.url_for("application_page", job_id=job.id)
-        destination = destination.include_query_params(message=message)
+        query = {"message": message}
+        if show_manual:
+            query["manual"] = "1"
+        destination = destination.include_query_params(**query)
     return RedirectResponse(destination, status_code=303)
 
 
@@ -1654,6 +1672,11 @@ def build_application_package(job_id: str, request: Request):
             if state and state.manual_job_description
             else job.description
         )
+        if not (job.description_expanded or (state and state.manual_job_description)):
+            return HTMLResponse(
+                "Complete job details must be loaded or pasted before generating an application package.",
+                status_code=409,
+            )
         resume_asset = session.scalar(
             select(ResumeAsset)
             .where(

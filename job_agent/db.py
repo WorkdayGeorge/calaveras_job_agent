@@ -52,6 +52,16 @@ def init_db() -> None:
                 "ADD COLUMN manual_job_description TEXT"
             ))
 
+        job_columns = {
+            column["name"]
+            for column in inspector.get_columns("jobs")
+        }
+        if "description_expanded" not in job_columns:
+            connection.execute(text(
+                "ALTER TABLE jobs "
+                "ADD COLUMN description_expanded BOOLEAN DEFAULT FALSE NOT NULL"
+            ))
+
     if engine.dialect.name == "postgresql":
         columns = {
             column["name"]: column

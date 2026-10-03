@@ -29,3 +29,5 @@ def test_application_prep_shows_full_job_details():
     assert "Paste Complete Posting Details" in template
     assert 'action="/jobs/{{ job.id }}/description/manual"' in template
     assert "state.manual_job_description" in template
+    assert "{% if show_manual_details %}" in template
+    assert "{% if not package and details_ready %}" in template
