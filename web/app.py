@@ -39,10 +39,12 @@ from job_agent.profile_store import (
     validate_candidate_profile,
 )
 from job_agent.profile_extractor import propose_profile_from_resume
+from job_agent.resume_search_terms import propose_search_terms_from_resume
 from job_agent.analytics import build_admin_analytics, resolve_date_range
 from job_agent.preflight import production_readiness
 from job_agent.backfill import backfill_progress, request_backfill
 from job_agent.user_search import (
+    add_resume_search_terms,
     ensure_user_search_terms,
     normalize_search_term,
     seed_legacy_job_matches,
@@ -2656,7 +2658,7 @@ async def upload_resume(
         ).all()
         for p in previous:
             p.is_current = False
-        session.add(ResumeAsset(
+        asset = ResumeAsset(
             user_id=target_user_id,
             resume_type=resume_type,
             filename=filename,
@@ -2664,9 +2666,54 @@ async def upload_resume(
             extracted_text=extracted_text,
             uploaded_at=datetime.now(timezone.utc),
             is_current=True,
-        ))
+        )
+        session.add(asset)
         session.commit()
+        added_terms: list[str] = []
+        term_error = None
+        if extracted_text:
+            try:
+                current_terms = ensure_user_search_terms(
+                    session, session.get(User, target_user_id)
+                )
+                suggestions = propose_search_terms_from_resume(
+                    extracted_text,
+                    [item.term for item in current_terms],
+                )
+                added_terms = add_resume_search_terms(
+                    session, target_user_id, suggestions
+                )
+                record_audit(
+                    session,
+                    "resume_search_terms_generated",
+                    actor_user_id=current_user_id(request),
+                    target_user_id=target_user_id,
+                    request=request,
+                    detail={
+                        "resume_asset_id": asset.id,
+                        "filename": filename,
+                        "suggested": len(suggestions),
+                        "added": added_terms,
+                        "existing_terms_preserved": True,
+                    },
+                )
+            except Exception as exc:
+                term_error = str(exc)
+                record_audit(
+                    session,
+                    "resume_search_term_generation_failed",
+                    actor_user_id=current_user_id(request),
+                    target_user_id=target_user_id,
+                    request=request,
+                    detail={"resume_asset_id": asset.id, "error": term_error},
+                )
+    if term_error:
+        message = "Document+uploaded;+search-term+generation+could+not+be+completed;+review+the+suggested+profile"
+    elif added_terms:
+        message = f"Document+uploaded;+{len(added_terms)}+new+search+terms+added;+review+the+suggested+profile"
+    else:
+        message = "Document+uploaded;+existing+search+terms+kept;+review+the+suggested+profile"
     return RedirectResponse(
-        f"/resumes?user_id={target_user_id}&message=Document+uploaded;+review+the+suggested+profile+before+saving",
+        f"/resumes?user_id={target_user_id}&message={message}",
         status_code=303,
     )
