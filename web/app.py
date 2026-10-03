@@ -1516,7 +1516,13 @@ def expand_job_description(job_id: str, request: Request):
         try:
             description = fetch_job_description(job.apply_url)
         except (JobDetailError, requests.RequestException) as exc:
-            message = f"Complete details could not be loaded: {exc}"
+            if "too long" in str(exc).lower():
+                message = (
+                    "Details could not be loaded within 20 seconds. Open the job "
+                    "posting, copy its description and requirements, and paste them below."
+                )
+            else:
+                message = f"Complete details could not be loaded: {exc} Paste the posting details below."
         else:
             if len(description) > len(job.description or ""):
                 job.description = description
@@ -1569,6 +1575,52 @@ def save_application_status(
     return RedirectResponse(f"/jobs/{job_id}/application", status_code=303)
 
 
+@app.post("/jobs/{job_id}/description/manual")
+def save_manual_job_description(
+    job_id: str,
+    request: Request,
+    posting_details: str = Form(...),
+):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    user_id = current_user_id(request)
+    if not user_id:
+        return HTMLResponse("Account ownership is required", status_code=409)
+
+    details = posting_details.strip()
+    if len(details) < 100:
+        message = "Paste at least 100 characters of job posting details."
+    elif len(details) > 100_000:
+        message = "Posting details must be 100,000 characters or fewer."
+    else:
+        with SessionLocal() as session:
+            job = get_assigned_job(session, job_id, request)
+            if not job:
+                return inaccessible_job_response(session, job_id, request)
+            state = get_or_create_job_state(session, user_id, job)
+            state.manual_job_description = details
+            state.updated_at = datetime.now(timezone.utc)
+            session.commit()
+            destination = request.url_for("application_page", job_id=job.id)
+        return RedirectResponse(
+            destination.include_query_params(
+                message="Posting details saved and will be used for application tailoring."
+            ),
+            status_code=303,
+        )
+
+    with SessionLocal() as session:
+        job = get_assigned_job(session, job_id, request)
+        if not job:
+            return inaccessible_job_response(session, job_id, request)
+        destination = request.url_for("application_page", job_id=job.id)
+    return RedirectResponse(
+        destination.include_query_params(message=message),
+        status_code=303,
+    )
+
+
 
 @app.post("/jobs/{job_id}/application/build")
 def build_application_package(job_id: str, request: Request):
@@ -1591,12 +1643,34 @@ def build_application_package(job_id: str, request: Request):
                 status_code=409,
             )
 
+        state = session.scalar(
+            select(UserJobState).where(
+                UserJobState.user_id == current_user_id(request),
+                UserJobState.job_id == job_id,
+            )
+        ) if current_user_id(request) else None
+        effective_description = (
+            state.manual_job_description
+            if state and state.manual_job_description
+            else job.description
+        )
+        resume_asset = session.scalar(
+            select(ResumeAsset)
+            .where(
+                ResumeAsset.user_id == current_user_id(request),
+                ResumeAsset.resume_type == "all-work-experience",
+                ResumeAsset.is_current.is_(True),
+            )
+            .order_by(desc(ResumeAsset.uploaded_at))
+            .limit(1)
+        ) if current_user_id(request) else None
+
         job_data = {
             "title": job.title,
             "company": job.company,
             "location": job.location,
             "employment_type": job.employment_type,
-            "description": job.description,
+            "description": effective_description,
             "requirements": job.requirements or [],
             "source": job.source,
         }
@@ -1605,6 +1679,7 @@ def build_application_package(job_id: str, request: Request):
             result = build_application_materials(
                 job_data,
                 profile=candidate_profile.profile_data,
+                resume_text=resume_asset.extracted_text if resume_asset else None,
             )
         except Exception:
             return HTMLResponse(
@@ -1629,7 +1704,7 @@ def build_application_package(job_id: str, request: Request):
             tailored_resume=result["tailored_resume"],
             cover_letter=result["cover_letter"],
             interview_questions=result["interview_questions"],
-            job_description_snapshot=job.description,
+            job_description_snapshot=effective_description,
             generation_model=env("OPENAI_MODEL", "gpt-5.6-luna"),
             truth_check_notes=result["truth_check_notes"],
             created_at=now,
@@ -2323,432 +2398,3 @@ def save_user_profile(
 
     with SessionLocal() as session:
         user = session.get(User, user_id)
-        if not user:
-            return HTMLResponse("User not found", status_code=404)
-        profile, preference = ensure_user_profile_records(session, user)
-        user_terms = ensure_user_search_terms(session, user)
-        if errors:
-            progress = backfill_progress(session, user.id, profile.resume_version)
-            return templates.TemplateResponse(request, "user_profile.html", {
-                "user": user,
-                "profile": profile,
-                "preference": preference,
-                "profile_data": profile_data,
-                "saved_profile_data": None,
-                "suggestion_asset": None,
-                "review_mode": profile_review == "on",
-                "backfill": progress,
-                "user_terms": user_terms,
-                "alignment": search_term_alignment(profile_data, user_terms),
-                "error": " ".join(errors),
-            }, status_code=400)
-
-        if profile.profile_data != profile_data:
-            profile.version += 1
-            profile.resume_version = f"profile-v{profile.version}"
-            profile.profile_data = profile_data
-        profile.is_active = bool(is_active)
-        profile.updated_at = datetime.now(timezone.utc)
-        preference.notification_email = recipient
-        preference.digest_time = digest_time
-        preference.immediate_alerts = bool(immediate_alerts)
-        preference.daily_digest = bool(daily_digest)
-        preference.updated_at = datetime.now(timezone.utc)
-        session.commit()
-        record_audit(
-            session,
-            "candidate_profile_updated",
-            actor_user_id=current_user_id(request),
-            target_user_id=user.id,
-            request=request,
-            detail={"active": profile.is_active, "version": profile.version},
-        )
-        queued = False
-        if queue_backfill_after_save == "on" and profile.is_active:
-            backfill = request_backfill(session, user.id)
-            queued = True
-            record_audit(
-                session,
-                "evaluation_backfill_requested",
-                actor_user_id=current_user_id(request),
-                target_user_id=user.id,
-                request=request,
-                detail={
-                    "resume_version": profile.resume_version,
-                    "pending": max(
-                        0,
-                        backfill.total_jobs - backfill.completed_jobs,
-                    ),
-                    "notifications": False,
-                    "requested_with_profile_save": True,
-                },
-            )
-    message = (
-        "Profile+saved+and+score+backfill+queued"
-        if queued
-        else "Profile+saved"
-    )
-    return RedirectResponse(
-        f"/admin/users/{user_id}/profile?message={message}",
-        status_code=303,
-    )
-
-
-@app.post("/admin/users/{user_id}/search-terms")
-def add_user_search_term(user_id: str, request: Request, term: str = Form(...)):
-    denial = require_admin_or_self(request, user_id)
-    if denial:
-        return denial
-    normalized = normalize_search_term(term)
-    with SessionLocal() as session:
-        user = session.get(User, user_id)
-        if not user:
-            return HTMLResponse("User not found", status_code=404)
-        exists = session.scalar(select(UserSearchTerm).where(
-            UserSearchTerm.user_id == user_id,
-            func.lower(UserSearchTerm.term) == normalized.lower(),
-        )) if normalized else None
-        if normalized and not exists:
-            new_term = UserSearchTerm(
-                user_id=user_id, term=normalized, enabled=True,
-                created_at=datetime.now(timezone.utc),
-            )
-            session.add(new_term)
-            session.commit()
-            record_audit(
-                session, "user_search_term_added",
-                actor_user_id=current_user_id(request), target_user_id=user_id,
-                request=request, detail={"term": normalized},
-            )
-    return RedirectResponse(f"/admin/users/{user_id}/profile", status_code=303)
-
-
-@app.post("/admin/users/{user_id}/search-terms/{term_id}/toggle")
-def toggle_user_search_term(user_id: str, term_id: str, request: Request):
-    denial = require_admin_or_self(request, user_id)
-    if denial:
-        return denial
-    with SessionLocal() as session:
-        term = session.scalar(select(UserSearchTerm).where(
-            UserSearchTerm.id == term_id,
-            UserSearchTerm.user_id == user_id,
-        ))
-        if term:
-            term.enabled = not term.enabled
-            session.commit()
-            record_audit(
-                session, "user_search_term_toggled",
-                actor_user_id=current_user_id(request), target_user_id=user_id,
-                request=request,
-                detail={"term": term.term, "enabled": term.enabled},
-            )
-    return RedirectResponse(f"/admin/users/{user_id}/profile", status_code=303)
-
-
-@app.post("/admin/users/{user_id}/search-terms/{term_id}/delete")
-def delete_user_search_term(user_id: str, term_id: str, request: Request):
-    denial = require_admin_or_self(request, user_id)
-    if denial:
-        return denial
-    with SessionLocal() as session:
-        term = session.scalar(select(UserSearchTerm).where(
-            UserSearchTerm.id == term_id,
-            UserSearchTerm.user_id == user_id,
-        ))
-        if term:
-            deleted_term = term.term
-            session.delete(term)
-            session.commit()
-            record_audit(
-                session, "user_search_term_deleted",
-                actor_user_id=current_user_id(request), target_user_id=user_id,
-                request=request, detail={"term": deleted_term},
-            )
-    return RedirectResponse(f"/admin/users/{user_id}/profile", status_code=303)
-
-
-@app.post("/admin/users/{user_id}/backfill")
-def queue_user_backfill(user_id: str, request: Request):
-    denial = require_admin_or_self(request, user_id)
-    if denial:
-        return denial
-    with SessionLocal() as session:
-        user = session.get(User, user_id)
-        profile = session.get(CandidateProfile, user_id)
-        if not user or not profile:
-            return HTMLResponse("User not found", status_code=404)
-        if not profile.is_active:
-            return RedirectResponse(
-                f"/admin/users/{user_id}/profile?message=Activate+the+profile+before+requesting+a+backfill",
-                status_code=303,
-            )
-        backfill = request_backfill(session, user_id)
-        record_audit(
-            session,
-            "evaluation_backfill_requested",
-            actor_user_id=current_user_id(request),
-            target_user_id=user_id,
-            request=request,
-            detail={
-                "resume_version": profile.resume_version,
-                "pending": max(0, backfill.total_jobs - backfill.completed_jobs),
-                "notifications": False,
-            },
-        )
-    return RedirectResponse(
-        f"/admin/users/{user_id}/profile?message=Score+backfill+queued",
-        status_code=303,
-    )
-
-
-@app.get("/sources", response_class=HTMLResponse)
-def sources_page(request: Request):
-    denial = require_admin(request)
-    if denial:
-        return denial
-
-    sources = get_job_sources()
-    employers, coverage_summary = get_employer_coverage()
-    return templates.TemplateResponse(
-        request,
-        "sources.html",
-        {
-            "sources": sources,
-            "employers": employers,
-            "coverage_summary": coverage_summary,
-        },
-    )
-
-
-@app.get("/runs", response_class=HTMLResponse)
-def runs_page(request: Request):
-    denial = require_admin(request)
-    if denial:
-        return denial
-    with SessionLocal() as session:
-        runs = session.scalars(select(RunLog).order_by(desc(RunLog.started_at)).limit(100)).all()
-    return templates.TemplateResponse(
-        request,
-        "runs.html",
-        {"runs": runs}
-    )
-
-@app.get("/resumes", response_class=HTMLResponse)
-def resumes_page(request: Request, user_id: str | None = None):
-    denial = require_auth(request)
-    if denial:
-        return denial
-    with SessionLocal() as session:
-        if admin_user(request):
-            users = session.scalars(select(User).order_by(User.display_name)).all()
-            selected_user_id = user_id or current_user_id(request)
-        else:
-            selected_user_id = current_user_id(request)
-            own_user = session.get(User, selected_user_id)
-            users = [own_user] if own_user else []
-        if selected_user_id and not session.get(User, selected_user_id):
-            selected_user_id = current_user_id(request)
-        assets = session.scalars(
-            select(ResumeAsset)
-            .where(ResumeAsset.user_id == selected_user_id)
-            .order_by(desc(ResumeAsset.uploaded_at))
-        ).all()
-    return templates.TemplateResponse(
-        request,
-        "resumes.html",
-        {"assets": assets, "users": users, "selected_user_id": selected_user_id}
-    )
-
-
-@app.post("/resumes/{asset_id}/profile-suggestion", response_class=HTMLResponse)
-def resume_profile_suggestion(asset_id: str, request: Request):
-    denial = require_auth(request)
-    if denial:
-        return denial
-    with SessionLocal() as session:
-        asset = session.get(ResumeAsset, asset_id)
-        if not asset or not asset.user_id:
-            return HTMLResponse("Resume not found", status_code=404)
-        if not admin_user(request) and asset.user_id != current_user_id(request):
-            return HTMLResponse("Access denied", status_code=403)
-        user = session.get(User, asset.user_id)
-        if not user:
-            return HTMLResponse("User not found", status_code=404)
-        profile, preference = ensure_user_profile_records(session, user)
-        user_terms = ensure_user_search_terms(session, user)
-        progress = backfill_progress(session, user.id, profile.resume_version)
-        enabled_terms = [term.term for term in user_terms if term.enabled]
-        error = None
-        identity_warning = None
-        source_label = "resume"
-        proposal = profile.profile_data
-        try:
-            resume_text = asset.extracted_text
-            if not resume_text:
-                resume_content = read_resume(asset.storage_uri)
-                resume_text = extract_resume_text(asset.filename, resume_content)
-                asset.extracted_text = resume_text
-                session.commit()
-            merge_profile = profile.profile_data
-            if not profile_identity_matches(
-                profile.profile_data.get("name"),
-                user.display_name,
-            ):
-                merge_profile = empty_candidate_profile(user)
-                identity_warning = (
-                    "The saved profile belonged to a different candidate and "
-                    "was not used as the basis for this suggestion."
-                )
-            proposal = propose_profile_from_resume(
-                resume_text,
-                merge_profile,
-                enabled_terms,
-                candidate_name=user.display_name,
-                source_label=source_label,
-            )
-        except Exception as exc:
-            error = f"{source_label} review could not be prepared: {exc}"
-        if not error:
-            record_audit(
-                session,
-                "resume_profile_suggestion_generated",
-                actor_user_id=current_user_id(request),
-                target_user_id=user.id,
-                request=request,
-                detail={
-                    "resume_asset_id": asset.id,
-                    "filename": asset.filename,
-                    "source_type": asset.resume_type,
-                },
-            )
-    return templates.TemplateResponse(
-        request,
-        "user_profile.html",
-        {
-            "user": user,
-            "profile": profile,
-            "preference": preference,
-            "profile_data": proposal,
-            "saved_profile_data": profile.profile_data if not error else None,
-            "suggestion_asset": asset if not error else None,
-            "suggestion_source_label": source_label,
-            "identity_warning": identity_warning,
-            "review_mode": not error,
-            "backfill": progress,
-            "user_terms": user_terms,
-            "alignment": search_term_alignment(proposal, user_terms),
-            "error": error,
-        },
-        status_code=502 if error else 200,
-    )
-
-@app.post("/resumes/upload")
-async def upload_resume(
-    request: Request,
-    user_id: str = Form(""),
-    resume: UploadFile = File(...),
-):
-    denial = require_auth(request)
-    if denial:
-        return denial
-    resume_type = "all-work-experience"
-    filename = resume.filename or "resume.docx"
-    if not filename.lower().endswith((".docx", ".pdf")):
-        return JSONResponse({"error": "upload a DOCX or PDF resume"}, status_code=400)
-
-    content = await resume.read()
-    if len(content) > 10 * 1024 * 1024:
-        return JSONResponse({"error": "resume exceeds 10 MB"}, status_code=400)
-    try:
-        extracted_text = extract_resume_text(filename, content)
-    except Exception:
-        extracted_text = None
-
-    with SessionLocal() as session:
-        target_user_id = user_id or current_user_id(request)
-        if not admin_user(request):
-            target_user_id = current_user_id(request)
-        if not target_user_id or not session.get(User, target_user_id):
-            return JSONResponse({"error": "invalid user"}, status_code=400)
-        uri = save_resume(filename, content, resume_type, target_user_id)
-        previous = session.scalars(
-            select(ResumeAsset).where(
-                ResumeAsset.user_id == target_user_id,
-                ResumeAsset.resume_type == resume_type,
-                ResumeAsset.is_current.is_(True),
-            )
-        ).all()
-        for p in previous:
-            p.is_current = False
-        asset = ResumeAsset(
-            user_id=target_user_id,
-            resume_type=resume_type,
-            filename=filename,
-            storage_uri=uri,
-            extracted_text=extracted_text,
-            uploaded_at=datetime.now(timezone.utc),
-            is_current=True,
-        )
-        session.add(asset)
-        session.commit()
-        added_terms: list[str] = []
-        term_error = None
-        if extracted_text:
-            try:
-                current_terms = ensure_user_search_terms(
-                    session, session.get(User, target_user_id)
-                )
-                suggestions = propose_search_terms_from_resume(
-                    extracted_text,
-                    [item.term for item in current_terms],
-                )
-                added_terms = add_resume_search_terms(
-                    session, target_user_id, suggestions
-                )
-                record_audit(
-                    session,
-                    "resume_search_terms_generated",
-                    actor_user_id=current_user_id(request),
-                    target_user_id=target_user_id,
-                    request=request,
-                    detail={
-                        "resume_asset_id": asset.id,
-                        "filename": filename,
-                        "suggested": len(suggestions),
-                        "added": added_terms,
-                        "existing_terms_preserved": True,
-                    },
-                )
-            except Exception as exc:
-                term_error = str(exc)
-                record_audit(
-                    session,
-                    "resume_search_term_generation_failed",
-                    actor_user_id=current_user_id(request),
-                    target_user_id=target_user_id,
-                    request=request,
-                    detail={"resume_asset_id": asset.id, "error": term_error},
-                )
-    if term_error:
-        message = (
-            "Document uploaded; search-term generation could not be completed; "
-            "review the suggested profile"
-        )
-    elif added_terms:
-        message = (
-            f"Document uploaded; {len(added_terms)} new search terms added; "
-            "review the suggested profile"
-        )
-    else:
-        message = (
-            "Document uploaded; existing search terms kept; "
-            "review the suggested profile"
-        )
-    redirect_query = urlencode({
-        "user_id": str(target_user_id),
-        "message": message,
-    })
-    return RedirectResponse(
-        f"/resumes?{redirect_query}",
-        status_code=303,
-    )
