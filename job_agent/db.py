@@ -42,6 +42,16 @@ def init_db() -> None:
                 "ALTER TABLE resume_assets ADD COLUMN extracted_text TEXT"
             ))
 
+        user_job_state_columns = {
+            column["name"]
+            for column in inspector.get_columns("user_job_states")
+        }
+        if "manual_job_description" not in user_job_state_columns:
+            connection.execute(text(
+                "ALTER TABLE user_job_states "
+                "ADD COLUMN manual_job_description TEXT"
+            ))
+
     if engine.dialect.name == "postgresql":
         columns = {
             column["name"]: column
