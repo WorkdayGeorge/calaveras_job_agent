@@ -7,34 +7,21 @@
 <form method="get" action="/resumes" class="card" style="margin-bottom:16px"><label>User</label><select name="user_id">{% for user in users %}<option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select><button class="btn secondary" style="margin-top:8px">View user</button></form>
 {% endif %}
 <div class="card">
-<p>Upload the current focused accounting/technical resume or the full work-history resume. New job-search phrases are generated from each upload and added without replacing existing terms. In Google Cloud, configure <code>GCS_BUCKET</code> so uploads persist.</p>
+<p>Upload the user's complete work-history resume. Every upload is designated <strong>All Work Experience</strong>. New job-search phrases are generated and added without replacing existing terms.</p>
 <form method="post" action="/resumes/upload" enctype="multipart/form-data">
 <input type="hidden" name="user_id" value="{{ selected_user_id or '' }}">
 <div class="row">
-<div><label>Resume type</label><select name="resume_type"><option value="focused">Focused Accounting / Technical</option><option value="all-work-experience">All Work Experience</option></select></div>
+<div><label>Resume type</label><input value="All Work Experience" disabled></div>
 <div><label>DOCX or PDF</label><input type="file" name="resume" accept=".docx,.pdf" required></div>
 <div style="flex:0 0 auto"><button class="btn">Upload</button></div>
 </div>
 </form>
 </div>
-<div class="card" style="margin-top:16px">
-<h2 style="margin-top:0">Import LinkedIn profile</h2>
-<p>On LinkedIn, open the user's profile and select <strong>More → Save to PDF</strong>. Upload that PDF here to prepare profile suggestions.</p>
-<form method="post" action="/resumes/upload" enctype="multipart/form-data">
-<input type="hidden" name="user_id" value="{{ selected_user_id or '' }}">
-<input type="hidden" name="resume_type" value="linkedin-profile">
-<div class="row">
-<div><label>LinkedIn profile PDF</label><input type="file" name="resume" accept=".pdf,application/pdf" required></div>
-<div style="flex:0 0 auto"><button class="btn">Import LinkedIn PDF</button></div>
-</div>
-</form>
-<p class="muted">The import only prepares a review. It does not connect to LinkedIn or change the saved candidate profile automatically.</p>
-</div>
 <h2>Uploaded profile sources</h2>
 <table>
 <tr><th>Source</th><th>Filename</th><th>Uploaded</th><th>Current</th><th>Profile</th></tr>
 {% for a in assets %}
-<tr><td>{% if a.resume_type == 'linkedin-profile' %}LinkedIn Profile{% elif a.resume_type == 'focused' %}Focused Resume{% else %}All Work Experience Resume{% endif %}</td><td>{{ a.filename }}</td><td>{{ a.uploaded_at|pacific_time }}</td><td>{{ "Yes" if a.is_current else "No" }}</td><td>{% if a.is_current %}<form method="post" action="/resumes/{{ a.id }}/profile-suggestion"><button class="btn">Review &amp; Update Profile</button></form>{% else %}<span class="muted">Use current source</span>{% endif %}</td></tr>
+<tr><td>All Work Experience</td><td>{{ a.filename }}</td><td>{{ a.uploaded_at|pacific_time }}</td><td>{{ "Yes" if a.is_current else "No" }}</td><td>{% if a.is_current %}<form method="post" action="/resumes/{{ a.id }}/profile-suggestion"><button class="btn">Review &amp; Update Profile</button></form>{% else %}<span class="muted">Use current source</span>{% endif %}</td></tr>
 {% else %}<tr><td colspan="5">No dashboard-managed resumes uploaded yet. The built-in master candidate profile is still active.</td></tr>{% endfor %}
 </table>
 <p class="muted">A resume or LinkedIn PDF never changes the candidate profile automatically. Review the suggested fields and save only verified information.</p>

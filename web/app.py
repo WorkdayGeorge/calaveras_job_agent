@@ -1781,10 +1781,10 @@ def application_assistant_api_profile(request: Request):
             select(ResumeAsset)
             .where(
                 ResumeAsset.user_id == user.id,
-                ResumeAsset.resume_type.in_(("focused", "all-work-experience")),
+                ResumeAsset.resume_type == "all-work-experience",
                 ResumeAsset.is_current.is_(True),
             )
-            .order_by(ResumeAsset.resume_type)
+            .order_by(desc(ResumeAsset.uploaded_at))
         ).all()
         payload = {
             "identity": {
@@ -1820,7 +1820,7 @@ def application_assistant_api_resume(asset_id: str, request: Request):
         if (
             not asset
             or asset.user_id != user.id
-            or asset.resume_type not in {"focused", "all-work-experience"}
+            or asset.resume_type != "all-work-experience"
             or not asset.is_current
         ):
             return JSONResponse({"error": "resume not found"}, status_code=404)
@@ -2546,11 +2546,7 @@ def resume_profile_suggestion(asset_id: str, request: Request):
         enabled_terms = [term.term for term in user_terms if term.enabled]
         error = None
         identity_warning = None
-        source_label = (
-            "LinkedIn profile"
-            if asset.resume_type == "linkedin-profile"
-            else "resume"
-        )
+        source_label = "resume"
         proposal = profile.profile_data
         try:
             resume_text = asset.extracted_text
@@ -2615,22 +2611,14 @@ def resume_profile_suggestion(asset_id: str, request: Request):
 @app.post("/resumes/upload")
 async def upload_resume(
     request: Request,
-    resume_type: str = Form(...),
     user_id: str = Form(""),
     resume: UploadFile = File(...),
 ):
     denial = require_auth(request)
     if denial:
         return denial
-    allowed_types = {"focused", "all-work-experience", "linkedin-profile"}
-    if resume_type not in allowed_types:
-        return JSONResponse({"error": "invalid document type"}, status_code=400)
-
+    resume_type = "all-work-experience"
     filename = resume.filename or "resume.docx"
-    if resume_type == "linkedin-profile" and not filename.lower().endswith(".pdf"):
-        return JSONResponse(
-            {"error": "upload a LinkedIn profile PDF"}, status_code=400
-        )
     if not filename.lower().endswith((".docx", ".pdf")):
         return JSONResponse({"error": "upload a DOCX or PDF resume"}, status_code=400)
 
