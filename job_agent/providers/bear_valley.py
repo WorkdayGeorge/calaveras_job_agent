@@ -27,6 +27,10 @@ class BearValleyProvider(JobProvider):
     SOURCE_KEY = "bear_valley"
     DEFAULT_LOCATION = "Bear Valley, CA"
     LOCAL_LOCATION_TERMS = ("bear valley", "calaveras")
+    TIMESTAMP_NOTE = (
+        "Exact posting timestamp supplied by Bear Valley's public ADP "
+        "career-center API."
+    )
 
     def __init__(self) -> None:
         self._cached_jobs: list[RawJob] | None = None
@@ -310,11 +314,7 @@ class BearValleyProvider(JobProvider):
                         "external_job_id": external_job_id,
                         "salary": salary,
                         "adp_post_date": posted_raw,
-                        "timestamp_note": (
-                            "Exact posting timestamp supplied "
-                            "by Bear Valley's public ADP "
-                            "career-center API."
-                        ),
+                        "timestamp_note": self.TIMESTAMP_NOTE,
                     },
                 )
             )
