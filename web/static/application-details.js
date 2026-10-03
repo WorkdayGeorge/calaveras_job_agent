@@ -46,7 +46,7 @@ if (completeDetailsForm) {
       completeDetailsMessage.hidden = false;
       if (error.name === "AbortError") {
         completeDetailsForm.hidden = true;
-        completeDetailsJobLink.hidden = false;
+        completeDetailsJobLink.style.display = "inline";
       }
       completeDetailsMessageText.textContent = error.name === "AbortError"
         ? "Complete details could not be loaded within 20 seconds. Copy the posting's description and requirements, then paste them below."

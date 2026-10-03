@@ -20,7 +20,7 @@ def test_application_prep_shows_full_job_details():
     assert "A complete description was not supplied" in template
     assert "Show Complete Details" in template
     assert 'action="/jobs/{{ job.id }}/description/expand"' in template
-    assert '<script src="/static/application-details.js" defer></script>' in template
+    assert '<script src="/static/application-details.js?v=20261003-2" defer></script>' in template
 
     script = Path("web/static/application-details.js").read_text()
     assert 'button.textContent = "Loading Details…"' not in script
@@ -37,6 +37,6 @@ def test_application_prep_shows_full_job_details():
     assert "manualDetailsSection.hidden = false" in script
     assert "completeDetailsForm.hidden = true" in script
     assert 'id="complete-details-job-link"' in template
-    assert "completeDetailsJobLink.hidden = false" in script
+    assert 'completeDetailsJobLink.style.display = "inline"' in script
     header = template.split('<div class="card">', 1)[0]
     assert "Open Job Posting" not in header
