@@ -1524,10 +1524,9 @@ def expand_job_description(job_id: str, request: Request):
                 message = "Complete job details loaded."
             else:
                 message = "The employer posting did not contain additional description text."
-    return RedirectResponse(
-        f"/jobs/{job_id}/application?{urlencode({'message': message})}",
-        status_code=303,
-    )
+        destination = request.url_for("application_page", job_id=job.id)
+        destination = destination.include_query_params(message=message)
+    return RedirectResponse(destination, status_code=303)
 
 
 @app.post("/jobs/{job_id}/application-status")
