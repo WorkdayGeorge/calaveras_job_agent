@@ -253,6 +253,7 @@ class UserJobState(Base):
     outcome: Mapped[str | None] = mapped_column(String(50))
     application_url: Mapped[str | None] = mapped_column(Text)
     resume_asset_id: Mapped[str | None] = mapped_column(ForeignKey("resume_assets.id"))
+    manual_job_description: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
