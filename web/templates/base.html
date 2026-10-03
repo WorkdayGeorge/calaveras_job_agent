@@ -91,6 +91,7 @@
       <div class="nav-section">
         <div class="nav-section-title">Client Management</div>
         <a href="/admin/users"{% if current_path.startswith("/admin/users") %} class="active" aria-current="page"{% endif %}>Users</a>
+        <a href="/resumes"{% if current_path.startswith("/resumes") %} class="active" aria-current="page"{% endif %}>Resumes</a>
         <a href="/admin/notifications"{% if current_path.startswith("/admin/notifications") %} class="active" aria-current="page"{% endif %}>Notifications</a>
       </div>
       <div class="nav-section">
@@ -99,13 +100,6 @@
         <a href="/runs"{% if current_path.startswith("/runs") %} class="active" aria-current="page"{% endif %}>Runs</a>
         <a href="/settings"{% if current_path.startswith("/settings") %} class="active" aria-current="page"{% endif %}>Settings</a>
         <a href="/admin/audit"{% if current_path.startswith("/admin/audit") %} class="active" aria-current="page"{% endif %}>Audit Log</a>
-      </div>
-      <div class="nav-section">
-        <div class="nav-section-title">My Account</div>
-        <a href="/profile"{% if current_path.startswith("/profile") %} class="active" aria-current="page"{% endif %}>Profile</a>
-        <a href="/resumes"{% if current_path.startswith("/resumes") %} class="active" aria-current="page"{% endif %}>Resumes</a>
-        <a href="/application-assistant"{% if current_path.startswith("/application-assistant") %} class="active" aria-current="page"{% endif %}>Application Assistant</a>
-        <a href="/onboarding"{% if current_path.startswith("/onboarding") %} class="active" aria-current="page"{% endif %}>Getting Started</a>
       </div>
     </nav>
   </aside>
