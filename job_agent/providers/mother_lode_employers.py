@@ -27,6 +27,17 @@ def _clean_html(value: Any) -> str:
     return text.strip()
 
 
+def _text_value(value: Any) -> str | None:
+    """Normalize API fields that may be either text or a list of text."""
+    if isinstance(value, (list, tuple, set)):
+        text = ", ".join(str(item).strip() for item in value if str(item).strip())
+        return text or None
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def _date(value: Any, *formats: str) -> datetime | None:
     if not value:
         return None
@@ -158,7 +169,7 @@ class ResourceConnectionProvider(JobProvider):
                     title=title,
                     company="The Resource Connection",
                     location=str(item.get("jobLocation") or "Calaveras County, CA"),
-                    employment_type=item.get("employmentType"),
+                    employment_type=_text_value(item.get("employmentType")),
                     description=description,
                     posted_at=_date(
                         detail.get("startDateRef") or item.get("startDateRef"),
@@ -257,7 +268,7 @@ class GoldenSanAndreasProvider(JobProvider):
                     title=str(posting.get("title") or title),
                     company="Golden San Andreas Care Center",
                     location=location,
-                    employment_type=(
+                    employment_type=_text_value(
                         posting.get("employmentType")
                         or self._attribute(attrs, "data-jobtype")
                     ),

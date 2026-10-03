@@ -96,6 +96,29 @@ def test_golden_san_andreas_uses_apploi_json_ld(monkeypatch):
     assert jobs[0].location == "San Andreas, CA"
 
 
+def test_golden_san_andreas_normalizes_multiple_employment_types(monkeypatch):
+    snippet = '''document.write('<div class="jobs-card" data-jobtype="PartTime">
+      <a class="job-link" href="https://apply-jobs.apploi.com/job/1932911">Assistant</a>
+    </div>')'''
+    posting = {
+        "@type": "JobPosting",
+        "title": "Assistant",
+        "employmentType": ["FULL_TIME", "PART_TIME"],
+    }
+    provider = GoldenSanAndreasProvider()
+
+    def get(url, **kwargs):
+        if "apploi.click" in url:
+            return Response(text=snippet)
+        return Response(
+            text=f'<script type="application/ld+json">{json.dumps(posting)}</script>'
+        )
+
+    monkeypatch.setattr(provider.session, "get", get)
+    job = provider.search(role="", location="", results_per_page=1)[0]
+    assert job.employment_type == "FULL_TIME, PART_TIME"
+
+
 def test_insight_manufacturing_uses_local_adp_configuration():
     provider = InsightManufacturingProvider()
 
