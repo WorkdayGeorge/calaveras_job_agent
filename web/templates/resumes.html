@@ -7,7 +7,7 @@
 <form method="get" action="/resumes" class="card" style="margin-bottom:16px"><label>User</label><select name="user_id">{% for user in users %}<option value="{{ user.id }}" {% if selected_user_id == user.id %}selected{% endif %}>{{ user.display_name }} — {{ user.email }}</option>{% endfor %}</select><button class="btn secondary" style="margin-top:8px">View user</button></form>
 {% endif %}
 <div class="card">
-<p>Upload the current focused accounting/technical resume or the full work-history resume. In Google Cloud, configure <code>GCS_BUCKET</code> so uploads persist.</p>
+<p>Upload the current focused accounting/technical resume or the full work-history resume. New job-search phrases are generated from each upload and added without replacing existing terms. In Google Cloud, configure <code>GCS_BUCKET</code> so uploads persist.</p>
 <form method="post" action="/resumes/upload" enctype="multipart/form-data">
 <input type="hidden" name="user_id" value="{{ selected_user_id or '' }}">
 <div class="row">

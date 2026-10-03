@@ -65,6 +65,31 @@ def enabled_user_terms(session, user_id: str) -> list[str]:
     ).all()
 
 
+def add_resume_search_terms(session, user_id: str, suggestions: list[str]) -> list[str]:
+    """Add new resume-derived terms without changing any existing term."""
+    existing = session.scalars(
+        select(UserSearchTerm).where(UserSearchTerm.user_id == user_id)
+    ).all()
+    existing_keys = {normalize_search_term(item.term).casefold() for item in existing}
+    now = datetime.now(timezone.utc)
+    added: list[str] = []
+    for suggestion in suggestions:
+        term = normalize_search_term(suggestion)
+        key = term.casefold()
+        if not term or key in existing_keys:
+            continue
+        session.add(UserSearchTerm(
+            user_id=user_id,
+            term=term,
+            enabled=True,
+            created_at=now,
+        ))
+        existing_keys.add(key)
+        added.append(term)
+    session.commit()
+    return added
+
+
 def record_user_job_match(session, user_id: str, job_id: str, search_term: str) -> None:
     term = normalize_search_term(search_term) or "matched"
     now = datetime.now(timezone.utc)
