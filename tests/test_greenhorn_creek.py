@@ -68,6 +68,32 @@ def test_greenhorn_uses_sitemap_when_company_page_is_dynamic(monkeypatch):
     assert [job.provider_job_id for job in jobs] == ["2707158"]
 
 
+def test_greenhorn_reads_indexed_sitemap_and_accepts_www(monkeypatch):
+    provider = GreenhornCreekProvider()
+    sitemap_index = '''<sitemapindex>
+      <sitemap><loc>https://harri.com/jobs-sitemap.xml</loc></sitemap>
+    </sitemapindex>'''
+    child = '''<urlset>
+      <url><loc>https://www.harri.com/Yad-BmDiBaycxfQT/job/2707164-pro-shop</loc></url>
+    </urlset>'''
+    posting = {"@type": "JobPosting", "title": "Pro-Shop Attendant"}
+
+    def get(url, **kwargs):
+        if url == provider.COMPANY_URL:
+            return Response("dynamic")
+        if url == provider.SITEMAP_URL:
+            return Response(sitemap_index)
+        if url.endswith("jobs-sitemap.xml"):
+            return Response(child)
+        return Response(
+            f'<script type="application/ld+json">{json.dumps(posting)}</script>'
+        )
+
+    monkeypatch.setattr(provider.session, "get", get)
+    jobs = provider.search(role="", location="")
+    assert [job.provider_job_id for job in jobs] == ["2707164"]
+
+
 def test_greenhorn_deduplicates_company_links(monkeypatch):
     company = '''
       <a href="/Yad-BmDiBaycxfQT/job/2707158-line-cook">details</a>
