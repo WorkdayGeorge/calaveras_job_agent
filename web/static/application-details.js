@@ -4,6 +4,8 @@ const completeDetailsForm = document.getElementById("complete-details-form");
 const completeDetailsButton = document.getElementById("complete-details-button");
 const manualDetailsSection = document.getElementById("manual-details-section");
 const completeDetailsMessage = document.getElementById("complete-details-message");
+const completeDetailsMessageText = document.getElementById("complete-details-message-text");
+const completeDetailsJobLink = document.getElementById("complete-details-job-link");
 const COMPLETE_DETAILS_TIMEOUT_MS = 20000;
 
 function resetCompleteDetailsButton() {
@@ -44,10 +46,11 @@ if (completeDetailsForm) {
       completeDetailsMessage.hidden = false;
       if (error.name === "AbortError") {
         completeDetailsForm.hidden = true;
+        completeDetailsJobLink.hidden = false;
       }
-      completeDetailsMessage.textContent = error.name === "AbortError"
-        ? "Details could not be loaded within 20 seconds. Open the job posting, copy its description and requirements, and paste them below."
-        : "Complete details could not be loaded. Open the job posting and paste its description and requirements below.";
+      completeDetailsMessageText.textContent = error.name === "AbortError"
+        ? "Complete details could not be loaded within 20 seconds. Copy the posting's description and requirements, then paste them below."
+        : "Complete details could not be loaded. Paste the posting's description and requirements below.";
       resetCompleteDetailsButton();
     }
   });

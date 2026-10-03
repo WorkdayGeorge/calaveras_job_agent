@@ -11,7 +11,6 @@
   </div>
   <div style="flex:0 0 auto;">
     <a class="btn secondary" href="/jobs">Back to Jobs</a>
-    <a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener">Open Job Posting</a>
   </div>
 </div>
 
@@ -43,7 +42,7 @@
   <form id="complete-details-form" method="post" action="/jobs/{{ job.id }}/description/expand" style="margin-top:18px;">
     <button id="complete-details-button" class="btn secondary" type="submit">Show Complete Details</button>
   </form>
-  <div id="complete-details-message" class="card warn" style="margin-top:16px;" hidden></div>
+  <div id="complete-details-message" class="card warn" style="margin-top:16px;" hidden><span id="complete-details-message-text"></span> <a id="complete-details-job-link" href="{{ job.apply_url }}" target="_blank" rel="noopener" hidden>Open Job Posting</a></div>
   <section id="manual-details-section"{% if not show_manual_details %} hidden{% endif %}>
   <h3 style="margin-top:24px;">Paste Complete Posting Details</h3>
   <p class="muted">If complete details cannot be loaded within 20 seconds, open the job posting, copy its description and requirements, and paste them below. Saved details will be used to tailor the application package.</p>

@@ -36,3 +36,7 @@ def test_application_prep_shows_full_job_details():
     assert "controller.abort()" in script
     assert "manualDetailsSection.hidden = false" in script
     assert "completeDetailsForm.hidden = true" in script
+    assert 'id="complete-details-job-link"' in template
+    assert "completeDetailsJobLink.hidden = false" in script
+    header = template.split('<div class="card">', 1)[0]
+    assert "Open Job Posting" not in header
