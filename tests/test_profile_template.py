@@ -26,3 +26,17 @@ def test_resume_upload_uses_only_all_work_experience():
     assert "All Work Experience" in template
     assert 'name="resume_type"' not in template
     assert "Import LinkedIn PDF" not in template
+
+
+def test_resume_upload_button_is_disabled_during_submission():
+    template = (
+        Path(__file__).resolve().parents[1]
+        / "web"
+        / "templates"
+        / "resumes.html"
+    ).read_text()
+
+    assert 'id="resume-upload-form"' in template
+    assert 'id="resume-upload-button"' in template
+    assert "button.disabled = true" in template
+    assert 'button.textContent = "Uploading…"' in template
