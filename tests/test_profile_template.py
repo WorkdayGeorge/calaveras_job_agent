@@ -15,7 +15,7 @@ def test_profile_form_always_posts_to_user_profile_save_route():
     )
 
 
-def test_linkedin_import_is_separate_from_application_resumes():
+def test_resume_upload_uses_only_all_work_experience():
     template = (
         Path(__file__).resolve().parents[1]
         / "web"
@@ -23,6 +23,6 @@ def test_linkedin_import_is_separate_from_application_resumes():
         / "resumes.html"
     ).read_text()
 
-    assert 'name="resume_type" value="linkedin-profile"' in template
-    assert 'accept=".pdf,application/pdf"' in template
-    assert "Import LinkedIn PDF" in template
+    assert "All Work Experience" in template
+    assert 'name="resume_type"' not in template
+    assert "Import LinkedIn PDF" not in template
