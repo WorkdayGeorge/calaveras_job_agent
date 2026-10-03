@@ -269,6 +269,15 @@ JOB_SOURCES = [
             {"label": "Greenhorn Creek Careers", "url": "https://harri.com/Yad-BmDiBaycxfQT"}
         ],
     },
+    {
+        "key": "calaveras_lumber",
+        "name": "Calaveras & Sonora Lumber",
+        "type": "Retail / building supply",
+        "description": "Official Calaveras and Sonora Lumber openings hosted by Paycom.",
+        "links": [
+            {"label": "Calaveras Lumber Careers", "url": "https://www.paycomonline.net/v4/ats/web.php/portal/11C30BF2C8590F32D1D813EA44A4CC1A/career-page"}
+        ],
+    },
 ]
 
 
@@ -450,11 +459,11 @@ EMPLOYER_COVERAGE = [
         "name": "Calaveras Lumber",
         "sector": "Retail / building supply",
         "area": "Angels Camp",
-        "status": "manual",
-        "method": "Aggregator/manual watch",
-        "priority": "Medium",
-        "url": "https://calaveraslumber.com/",
-        "notes": "Major local employer without a verified structured career feed.",
+        "status": "integrated",
+        "method": "Direct Paycom provider",
+        "priority": "Covered",
+        "url": "https://www.paycomonline.net/v4/ats/web.php/portal/11C30BF2C8590F32D1D813EA44A4CC1A/career-page",
+        "notes": "Official Calaveras and Sonora Lumber openings are monitored directly.",
     },
     {
         "name": "Mar-Val Food Stores",
