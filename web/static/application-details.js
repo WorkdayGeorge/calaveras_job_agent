@@ -42,6 +42,9 @@ if (completeDetailsForm) {
       window.clearTimeout(timeout);
       manualDetailsSection.hidden = false;
       completeDetailsMessage.hidden = false;
+      if (error.name === "AbortError") {
+        completeDetailsForm.hidden = true;
+      }
       completeDetailsMessage.textContent = error.name === "AbortError"
         ? "Details could not be loaded within 20 seconds. Open the job posting, copy its description and requirements, and paste them below."
         : "Complete details could not be loaded. Open the job posting and paste its description and requirements below.";
