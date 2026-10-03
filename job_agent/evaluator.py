@@ -14,10 +14,7 @@ def load_candidate_profile(path: str | None = None) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
 
 def _select_resume_fallback(job: dict, profile: dict) -> str:
-    text = f"{job.get('title','')} {job.get('description','')}".lower()
-    for term in profile["resume_selection_rules"]["focused"]:
-        if term in text:
-            return "focused"
+    del job, profile
     return "all-work-experience"
 
 def evaluate_without_ai(job: dict, profile: dict) -> dict:
@@ -65,6 +62,5 @@ def evaluate_job(job: dict, profile: dict) -> dict:
     # Hard validation/normalization.
     result["fit_score"] = max(0, min(100, int(result["fit_score"])))
     result["classification"], result["recommendation"] = classify(result["fit_score"])
-    if result.get("selected_resume") not in {"focused", "all-work-experience"}:
-        result["selected_resume"] = _select_resume_fallback(job, profile)
+    result["selected_resume"] = "all-work-experience"
     return result
