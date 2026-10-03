@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Resp
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.staticfiles import StaticFiles
 from sqlalchemy import select, desc, func, and_, case, or_
 
 from job_agent.db import init_db, SessionLocal
@@ -385,6 +386,11 @@ def send_administrator_job_notifications(
     return counts
 
 app = FastAPI(title="Calaveras Job Agent")
+app.mount(
+    "/static",
+    StaticFiles(directory=Path(__file__).resolve().parent / "static"),
+    name="static",
+)
 
 
 class BrowserSecurityMiddleware(BaseHTTPMiddleware):
@@ -407,7 +413,7 @@ class BrowserSecurityMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "same-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
-            "script-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+            "script-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
         )
         return response
 

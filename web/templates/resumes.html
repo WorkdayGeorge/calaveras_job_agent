@@ -16,14 +16,7 @@
 <div style="flex:0 0 auto"><button id="resume-upload-button" class="btn" type="submit">Upload</button></div>
 </div>
 </form>
-<script>
-document.getElementById("resume-upload-form").addEventListener("submit", function () {
-  const button = document.getElementById("resume-upload-button");
-  button.disabled = true;
-  button.textContent = "Uploading…";
-  button.setAttribute("aria-busy", "true");
-});
-</script>
+<script src="/static/resume-upload.js" defer></script>
 </div>
 <h2>Uploaded profile sources</h2>
 <table>
