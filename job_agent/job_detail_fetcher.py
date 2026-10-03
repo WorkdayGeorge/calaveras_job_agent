@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import socket
+from time import monotonic
 from urllib.parse import urljoin, urlsplit
 
 import requests
@@ -10,7 +11,8 @@ from lxml import html as lxml_html
 
 MAX_RESPONSE_BYTES = 2_000_000
 MAX_DESCRIPTION_CHARS = 100_000
-MAX_REDIRECTS = 5
+MAX_REDIRECTS = 3
+TOTAL_TIMEOUT_SECONDS = 25
 
 
 class JobDetailError(ValueError):
@@ -99,13 +101,17 @@ def extract_job_description(html: str) -> str:
 
 
 def fetch_job_description(url: str) -> str:
+    deadline = monotonic() + TOTAL_TIMEOUT_SECONDS
     current_url = _validate_public_url(url)
     headers = {"User-Agent": "CalaverasJobAgent/1.0 (+job-detail-request)"}
     for _ in range(MAX_REDIRECTS + 1):
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise JobDetailError("The employer website took too long to respond.")
         response = requests.get(
             current_url,
             headers=headers,
-            timeout=20,
+            timeout=(min(5, remaining), min(8, remaining)),
             allow_redirects=False,
             stream=True,
         )
@@ -121,6 +127,8 @@ def fetch_job_description(url: str) -> str:
             raise JobDetailError("The employer posting is not an HTML page.")
         data = bytearray()
         for chunk in response.iter_content(64 * 1024):
+            if monotonic() >= deadline:
+                raise JobDetailError("The employer website took too long to respond.")
             data.extend(chunk)
             if len(data) > MAX_RESPONSE_BYTES:
                 raise JobDetailError("The employer posting is too large to import safely.")
