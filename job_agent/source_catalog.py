@@ -25,6 +25,54 @@ JOB_SOURCES = [
         ],
     },
     {
+        "key": "golden_san_andreas",
+        "name": "Golden San Andreas Care Center",
+        "type": "Healthcare",
+        "description": "Official local care-center openings published through Apploi.",
+        "links": [
+            {
+                "label": "Golden San Andreas Careers",
+                "url": "https://evergreenhcg.com/locations/golden-sanandreas-care-center/",
+            }
+        ],
+    },
+    {
+        "key": "chips_forestry",
+        "name": "CHIPS Forestry",
+        "type": "Forestry / nonprofit",
+        "description": (
+            "Official CHIPS hiring page. Monitored without creating a job record "
+            "until CHIPS publishes a specific opening."
+        ),
+        "links": [
+            {"label": "CHIPS Forestry", "url": "https://www.chipsforestry.org/"}
+        ],
+    },
+    {
+        "key": "resource_connection",
+        "name": "The Resource Connection",
+        "type": "Local nonprofit",
+        "description": "Official Calaveras and Amador County openings from ApplicantPro.",
+        "links": [
+            {
+                "label": "The Resource Connection Jobs",
+                "url": "https://trcac.applicantpro.com/jobs/",
+            }
+        ],
+    },
+    {
+        "key": "insight_manufacturing",
+        "name": "Insight Manufacturing",
+        "type": "Manufacturing",
+        "description": "Official manufacturing openings in Murphys published through ADP.",
+        "links": [
+            {
+                "label": "Insight Manufacturing Careers",
+                "url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?ccId=19000101_000001&cid=824005bc-0b5e-446f-847a-33863ec245d7&lang=en_US&type=MP",
+            }
+        ],
+    },
+    {
         "key": "calaveras_county",
         "name": "Calaveras County Government Jobs",
         "type": "Local government",
