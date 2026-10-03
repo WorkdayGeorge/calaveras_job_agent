@@ -34,6 +34,7 @@ from .providers.mother_lode_employers import (
     InsightManufacturingProvider,
     ResourceConnectionProvider,
 )
+from .providers.greenhorn_creek import GreenhornCreekProvider
 from .providers.amador_county import AmadorCountyProvider
 from .providers.tuolumne_county import TuolumneCountyProvider
 from .providers.worldmark_angels_camp import WorldMarkAngelsCampProvider
@@ -137,6 +138,8 @@ def get_providers():
             providers.append(ResourceConnectionProvider())
         elif name == "insight_manufacturing":
             providers.append(InsightManufacturingProvider())
+        elif name == "greenhorn_creek":
+            providers.append(GreenhornCreekProvider())
         elif name == "amador_county":
             providers.append(AmadorCountyProvider())
         elif name == "tuolumne_county":
