@@ -28,6 +28,12 @@ from .providers.adventist_health import AdventistHealthProvider
 from .providers.pge import PGEProvider
 from .providers.usajobs import USAJobsProvider
 from .providers.remotive import RemotiveProvider
+from .providers.mother_lode_employers import (
+    CHIPSForestryProvider,
+    GoldenSanAndreasProvider,
+    InsightManufacturingProvider,
+    ResourceConnectionProvider,
+)
 from .providers.amador_county import AmadorCountyProvider
 from .providers.tuolumne_county import TuolumneCountyProvider
 from .providers.worldmark_angels_camp import WorldMarkAngelsCampProvider
@@ -123,6 +129,14 @@ def get_providers():
             providers.append(USAJobsProvider())
         elif name == "remotive":
             providers.append(RemotiveProvider())
+        elif name == "golden_san_andreas":
+            providers.append(GoldenSanAndreasProvider())
+        elif name == "chips_forestry":
+            providers.append(CHIPSForestryProvider())
+        elif name == "resource_connection":
+            providers.append(ResourceConnectionProvider())
+        elif name == "insight_manufacturing":
+            providers.append(InsightManufacturingProvider())
         elif name == "amador_county":
             providers.append(AmadorCountyProvider())
         elif name == "tuolumne_county":
