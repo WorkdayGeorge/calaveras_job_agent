@@ -38,5 +38,13 @@ def test_resume_upload_button_is_disabled_during_submission():
 
     assert 'id="resume-upload-form"' in template
     assert 'id="resume-upload-button"' in template
-    assert "button.disabled = true" in template
-    assert 'button.textContent = "Uploading…"' in template
+    assert '<script src="/static/resume-upload.js" defer></script>' in template
+
+    script = (
+        Path(__file__).resolve().parents[1]
+        / "web"
+        / "static"
+        / "resume-upload.js"
+    ).read_text()
+    assert "button.disabled = true" in script
+    assert 'button.textContent = "Uploading…"' in script
