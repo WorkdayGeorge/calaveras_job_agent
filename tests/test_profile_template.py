@@ -48,3 +48,7 @@ def test_resume_upload_button_is_disabled_during_submission():
     ).read_text()
     assert "button.disabled = true" in script
     assert 'button.textContent = "Uploading…"' in script
+    assert 'class="profile-review-form"' in template
+    assert 'class="btn profile-review-button"' in template
+    assert 'document.querySelectorAll(".profile-review-form")' in script
+    assert 'button.textContent = "Preparing Review…"' in script
