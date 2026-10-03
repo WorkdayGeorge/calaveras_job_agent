@@ -15,6 +15,8 @@
   </div>
 </div>
 
+{% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:18px;">{{ request.query_params.get("message") }}</div>{% endif %}
+
 <div class="card">
   <h2 style="margin-top:0;">Full Job Description</h2>
   <strong>{{ job.title }}</strong><br>
@@ -38,6 +40,9 @@
       {% for requirement in job.requirements %}<li style="margin-bottom:8px;">{{ requirement }}</li>{% endfor %}
     </ul>
   {% endif %}
+  <form id="complete-details-form" method="post" action="/jobs/{{ job.id }}/description/expand" style="margin-top:18px;">
+    <button id="complete-details-button" class="btn secondary" type="submit">Show Complete Details</button>
+  </form>
 </div>
 
 {% if package %}
@@ -113,5 +118,7 @@
 </div>
 {% endif %}
 {% endif %}
+
+<script src="/static/application-details.js" defer></script>
 
 {% endblock %}
