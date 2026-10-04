@@ -34,13 +34,13 @@
   {% else %}
     <p class="muted" style="margin-top:18px;">A complete description was not supplied by this job source. Use Open Job Posting to review the employer's listing.</p>
   {% endif %}
+  </div>
   {% if job.requirements %}
     <h3>Requirements and Qualifications</h3>
     <ul>
       {% for requirement in job.requirements %}<li style="margin-bottom:8px;">{{ requirement }}</li>{% endfor %}
     </ul>
   {% endif %}
-  </div>
   <form id="complete-details-form" method="post" action="/jobs/{{ job.id }}/description/expand" style="margin-top:18px;"{% if show_manual_details %} hidden{% endif %}>
     <button id="complete-details-button" class="btn secondary" type="submit">Show Complete Details</button>
   </form>
