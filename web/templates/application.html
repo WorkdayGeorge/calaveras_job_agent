@@ -14,7 +14,7 @@
   </div>
 </div>
 
-{% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:18px;">{{ request.query_params.get("message") }}{% if show_manual_details %} <a href="{{ job.apply_url }}" target="_blank" rel="noopener">Open Job Posting</a>{% endif %}</div>{% endif %}
+{% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:18px;">{{ request.query_params.get("message") }}</div>{% endif %}
 
 <div class="card">
   <h2 style="margin-top:0;">Full Job Description</h2>
@@ -42,10 +42,10 @@
   <form id="complete-details-form" method="post" action="/jobs/{{ job.id }}/description/expand" style="margin-top:18px;">
     <button id="complete-details-button" class="btn secondary" type="submit">Show Complete Details</button>
   </form>
-  <div id="complete-details-message" class="card warn" style="margin-top:16px;" hidden><span id="complete-details-message-text"></span> <a id="complete-details-job-link" href="{{ job.apply_url }}" target="_blank" rel="noopener" style="display:none;">Open Job Posting</a></div>
+  <div id="complete-details-message" class="card warn" style="margin-top:16px;" hidden><span id="complete-details-message-text"></span></div>
   <section id="manual-details-section"{% if not show_manual_details %} hidden{% endif %}>
   <h3 style="margin-top:24px;">Paste Complete Posting Details</h3>
-  <p class="muted">If complete details cannot be loaded within 20 seconds, open the job posting, copy its description and requirements, and paste them below. Saved details will be used to tailor the application package.</p>
+  <p class="muted">Complete details could not be loaded. Copy the posting's description and requirements, paste them below, and save them for application tailoring. <a href="{{ job.apply_url }}" target="_blank" rel="noopener">Open Job Posting</a></p>
   <form method="post" action="/jobs/{{ job.id }}/description/manual">
     <label for="posting-details">Job description and requirements</label>
     <textarea id="posting-details" name="posting_details" rows="12" maxlength="100000" required placeholder="Paste the complete job posting here...">{{ state.manual_job_description if state and state.manual_job_description else '' }}</textarea>
