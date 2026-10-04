@@ -60,3 +60,16 @@ def extract_resume_text(filename: str, content: bytes) -> str:
                 paragraphs.append(" | ".join(cell.text for cell in row.cells))
         return "\n".join(value for value in paragraphs if value.strip()).strip()
     raise ValueError("Only DOCX and PDF resumes are supported.")
+
+
+
+def delete_resume(storage_uri: str) -> None:
+    if storage_uri.startswith("gs://"):
+        bucket_name, object_name = storage_uri[5:].split("/", 1)
+        from google.cloud import storage
+        client = storage.Client()
+        client.bucket(bucket_name).blob(object_name).delete()
+        return
+    path = Path(storage_uri)
+    if path.exists() and path.is_file():
+        path.unlink()
