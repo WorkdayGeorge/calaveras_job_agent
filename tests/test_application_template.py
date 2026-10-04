@@ -28,7 +28,9 @@ def test_application_prep_shows_full_job_details():
     assert 'window.addEventListener("pageshow", resetCompleteDetailsButton)' in script
     assert "Paste Complete Posting Details" not in template
     assert "Pull Description from Job Posting and Paste Below" in template
-    assert 'action="/jobs/{{ job.id }}/description/manual"' in template
+    assert 'action="/jobs/{{ job.id }}/application/build"' in template
+    assert "Generate Resume and Cover Letter" in template
+    assert "Save Posting Details" not in template
     assert "state.manual_job_description" in template
     assert 'id="manual-details-section"' in template
     assert "{% if not show_manual_details %} hidden{% endif %}" in template
