@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block content %}
+<h1>Account Data</h1>
+<p class="muted">Your immutable Account ID is <code>{{ user.id }}</code>. Your name is display information and is not used as account identity.</p>
+{% if error %}<div class="card warn" style="margin-bottom:18px">{{ error }}</div>{% endif %}
+{% if message %}<div class="card good" style="margin-bottom:18px">{{ message }}</div>{% endif %}
+
+{% if pending_action %}
+<div class="card">
+  <h2 style="margin-top:0">Confirm {{ "candidate-data reset" if pending_action == "reset" else "account deletion" }}</h2>
+  <p>Enter the six-digit code sent to {{ user.email }}.</p>
+  <form method="post" action="/account/data/confirm">
+    <input type="hidden" name="action" value="{{ pending_action }}">
+    <label>Verification code</label>
+    <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+    <button class="btn danger" style="margin-top:12px">Confirm</button>
+  </form>
+</div>
+{% else %}
+<div class="card">
+  <h2 style="margin-top:0">Reset Candidate Data</h2>
+  <p>Recommended when resume or profile information belongs to the wrong person. Your login, email, password, and Account ID remain unchanged.</p>
+  <p class="muted">This removes {{ summary.resumes }} resume(s), {{ summary.application_packages }} generated package(s), {{ summary.evaluations }} score(s), {{ summary.search_terms }} search term(s), candidate profile information, application tracking, and application-assistant answers.</p>
+  <form method="post" action="/account/data/request">
+    <input type="hidden" name="action" value="reset">
+    <label>Current password</label><input type="password" name="password" required>
+    <label>Type RESET to continue</label><input name="confirmation" pattern="RESET" required>
+    <button class="btn danger" style="margin-top:12px">Reset Candidate Data</button>
+  </form>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <h2 style="margin-top:0">Delete My Account</h2>
+  <p>Permanently deletes this non-administrator account and its stored data. Your administrator must send a new invitation before the same email can be used again.</p>
+  <form method="post" action="/account/data/request">
+    <input type="hidden" name="action" value="delete">
+    <label>Current password</label><input type="password" name="password" required>
+    <label>Type DELETE to continue</label><input name="confirmation" pattern="DELETE" required>
+    <button class="btn danger" style="margin-top:12px">Delete My Account</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -24,6 +24,12 @@ from job_agent.models import (
     UserSearchTerm, UserJobMatch, AuthToken, UserOnboarding, uuid_str,
 )
 from job_agent.application_builder import build_application_materials
+from job_agent.account_cleanup import (
+    candidate_data_summary,
+    delete_user_account,
+    reset_candidate_data,
+    resume_storage_uris,
+)
 from job_agent.source_catalog import get_employer_coverage, get_job_sources
 from job_agent.config import load_settings, env
 from job_agent.notify import email_notify, email_text, normalize_email_address
@@ -61,7 +67,7 @@ from job_agent.application_assistant import (
 
 
 from .cloud_trigger import trigger_worker
-from .resume_storage import extract_resume_text, read_resume, save_resume
+from .resume_storage import delete_resume, extract_resume_text, read_resume, save_resume
 from .auth import (
     bootstrap_admin,
     consume_token,
@@ -2589,6 +2595,168 @@ def queue_user_backfill(user_id: str, request: Request):
         )
     return RedirectResponse(
         f"/admin/users/{user_id}/profile?message=Score+backfill+queued",
+        status_code=303,
+    )
+
+
+@app.get("/account/data", response_class=HTMLResponse)
+def account_data_page(request: Request):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    with SessionLocal() as session:
+        user = session.get(User, current_user_id(request))
+        if not user:
+            return RedirectResponse("/login", status_code=303)
+        if user.role == "administrator":
+            return HTMLResponse(
+                "The administrator account cannot be reset or deleted.",
+                status_code=403,
+            )
+        summary = candidate_data_summary(session, user.id)
+    return templates.TemplateResponse(request, "account_data.html", {
+        "user": user,
+        "summary": summary,
+        "pending_action": request.session.get("pending_account_action"),
+        "error": None,
+        "message": request.query_params.get("message"),
+    })
+
+
+@app.post("/account/data/request", response_class=HTMLResponse)
+def request_account_data_action(
+    request: Request,
+    action: str = Form(...),
+    password: str = Form(...),
+    confirmation: str = Form(...),
+):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    expected = {"reset": "RESET", "delete": "DELETE"}
+    with SessionLocal() as session:
+        user = session.get(User, current_user_id(request))
+        if not user:
+            return RedirectResponse("/login", status_code=303)
+        summary = candidate_data_summary(session, user.id)
+        error = None
+        if user.role == "administrator":
+            error = "The administrator account cannot be reset or deleted."
+        elif action not in expected:
+            error = "Invalid account-data action."
+        elif confirmation.strip() != expected[action]:
+            error = f"Type {expected[action]} exactly to continue."
+        elif not verify_password(password, user.password_hash):
+            error = "The current password is incorrect."
+        if error:
+            return templates.TemplateResponse(request, "account_data.html", {
+                "user": user,
+                "summary": summary,
+                "pending_action": None,
+                "error": error,
+                "message": None,
+            }, status_code=400)
+
+        code = new_numeric_code()
+        issue_token(session, user, f"account_{action}", code, minutes=10)
+        sent, _ = email_text(
+            user.email,
+            "Confirm your Calaveras Job Agent account change",
+            f"Your six-digit confirmation code is: {code}\n\n"
+            "This code expires in 10 minutes. If you did not request this "
+            "change, do not share the code and contact your administrator.",
+        )
+        if not sent:
+            return templates.TemplateResponse(request, "account_data.html", {
+                "user": user,
+                "summary": summary,
+                "pending_action": None,
+                "error": "The confirmation email could not be sent.",
+                "message": None,
+            }, status_code=503)
+        request.session["pending_account_action"] = action
+        record_audit(
+            session,
+            f"account_{action}_requested",
+            actor_user_id=user.id,
+            target_user_id=user.id,
+            request=request,
+        )
+    return RedirectResponse("/account/data", status_code=303)
+
+
+@app.post("/account/data/confirm", response_class=HTMLResponse)
+def confirm_account_data_action(
+    request: Request,
+    action: str = Form(...),
+    code: str = Form(...),
+):
+    denial = require_auth(request)
+    if denial:
+        return denial
+    if action not in {"reset", "delete"} or (
+        request.session.get("pending_account_action") != action
+    ):
+        return RedirectResponse("/account/data", status_code=303)
+
+    with SessionLocal() as session:
+        user = session.get(User, current_user_id(request))
+        if not user:
+            request.session.clear()
+            return RedirectResponse("/login", status_code=303)
+        if user.role == "administrator":
+            return HTMLResponse(
+                "The administrator account cannot be reset or deleted.",
+                status_code=403,
+            )
+        if not consume_token(session, user, f"account_{action}", code):
+            summary = candidate_data_summary(session, user.id)
+            return templates.TemplateResponse(request, "account_data.html", {
+                "user": user,
+                "summary": summary,
+                "pending_action": action,
+                "error": "The confirmation code is invalid or expired.",
+                "message": None,
+            }, status_code=400)
+
+        storage_uris = resume_storage_uris(session, user.id)
+        try:
+            for storage_uri in storage_uris:
+                delete_resume(storage_uri)
+        except Exception:
+            summary = candidate_data_summary(session, user.id)
+            return templates.TemplateResponse(request, "account_data.html", {
+                "user": user,
+                "summary": summary,
+                "pending_action": action,
+                "error": "Stored resume files could not be removed. No account data was deleted.",
+                "message": None,
+            }, status_code=500)
+
+        if action == "reset":
+            record_audit(
+                session,
+                "candidate_data_reset",
+                actor_user_id=user.id,
+                target_user_id=user.id,
+                request=request,
+            )
+            reset_candidate_data(session, user)
+            request.session.pop("pending_account_action", None)
+            return RedirectResponse("/onboarding", status_code=303)
+
+        record_audit(
+            session,
+            "account_deleted",
+            actor_user_id=user.id,
+            target_user_id=user.id,
+            request=request,
+        )
+        delete_user_account(session, user)
+
+    request.session.clear()
+    return RedirectResponse(
+        "/login?message=Your+account+has+been+deleted.",
         status_code=303,
     )
 
