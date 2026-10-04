@@ -1620,13 +1620,7 @@ def save_manual_job_description(
             state.manual_job_description = details
             state.updated_at = datetime.now(timezone.utc)
             session.commit()
-            destination = request.url_for("application_page", job_id=job.id)
-        return RedirectResponse(
-            destination.include_query_params(
-                message="Posting details saved and will be used for application tailoring."
-            ),
-            status_code=303,
-        )
+        return build_application_package(job_id, request)
 
     with SessionLocal() as session:
         job = get_assigned_job(session, job_id, request)
@@ -1641,11 +1635,7 @@ def save_manual_job_description(
 
 
 @app.post("/jobs/{job_id}/application/build")
-def build_application_package(
-    job_id: str,
-    request: Request,
-    posting_details: str = Form(""),
-):
+def build_application_package(job_id: str, request: Request):
     denial = require_auth(request)
     if denial:
         return denial
@@ -1671,36 +1661,6 @@ def build_application_package(
                 UserJobState.job_id == job_id,
             )
         ) if current_user_id(request) else None
-
-        if posting_details:
-            details = posting_details.strip()
-            if len(details) < 100:
-                destination = request.url_for("application_page", job_id=job.id)
-                return RedirectResponse(
-                    destination.include_query_params(
-                        manual="1",
-                        message="Paste at least 100 characters of job posting details.",
-                    ),
-                    status_code=303,
-                )
-            if len(details) > 100_000:
-                destination = request.url_for("application_page", job_id=job.id)
-                return RedirectResponse(
-                    destination.include_query_params(
-                        manual="1",
-                        message="Posting details must be 100,000 characters or fewer.",
-                    ),
-                    status_code=303,
-                )
-            state = state or get_or_create_job_state(
-                session,
-                current_user_id(request),
-                job,
-            )
-            state.manual_job_description = details
-            state.updated_at = datetime.now(timezone.utc)
-            session.commit()
-
         effective_description = (
             state.manual_job_description
             if state and state.manual_job_description
