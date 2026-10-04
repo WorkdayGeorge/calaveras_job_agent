@@ -26,3 +26,18 @@ def test_admin_navigation_manages_profiles_through_users():
     assert 'href="/application-assistant"' not in admin_navigation
     assert 'href="/onboarding"' not in admin_navigation
     assert "My Account" not in admin_navigation
+
+
+def test_account_actions_are_grouped_in_dropdown():
+    template = Path("web/templates/base.html").read_text()
+
+    menu = template.split('<details class="account-menu">', 1)[1].split(
+        "</details>",
+        1,
+    )[0]
+    assert "<summary>Account</summary>" in menu
+    assert 'href="/account/change-password">Change Password</a>' in menu
+    assert 'href="/account/data">Account Data</a>' in menu
+    assert 'action="/logout"' in menu
+    assert ">Sign Out</button>" in menu
+    assert 'request.session.get("role") != "administrator"' in menu

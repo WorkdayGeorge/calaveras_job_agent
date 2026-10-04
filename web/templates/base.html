@@ -23,6 +23,15 @@
     .admin-sidebar a:hover { background:#f2f4f7; color:#101828; }
     .admin-sidebar a.active { background:#eff6ff; color:#1d4ed8; }
     .user-nav { display:inline; }
+    .account-menu { position:relative; display:inline-block; }
+    .account-menu summary { cursor:pointer; color:#dbeafe; font-weight:650; list-style:none; }
+    .account-menu summary::-webkit-details-marker { display:none; }
+    .account-menu summary::after { content:" ▾"; font-size:11px; }
+    .account-menu[open] summary::after { content:" ▴"; }
+    .account-menu-panel { position:absolute; z-index:20; right:0; top:calc(100% + 9px); min-width:190px; padding:7px; background:#fff; border:1px solid var(--line); border-radius:9px; box-shadow:0 8px 24px rgba(15,23,42,.2); }
+    header .account-menu-panel a, .account-menu-panel button { display:block; width:100%; margin:0; padding:9px 10px; border:0; border-radius:6px; background:transparent; color:#344054; text-align:left; font:inherit; font-size:13px; cursor:pointer; }
+    header .account-menu-panel a:hover, .account-menu-panel button:hover { background:#f2f4f7; color:#101828; }
+    .account-menu-panel form { margin:0; }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
     .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 1px 3px rgba(16,24,40,.04); }
     .metric { font-size:30px; font-weight:750; margin:6px 0; }
@@ -72,8 +81,18 @@
   </div>
   <div>
     {% if request.session.get("email") %}<span style="margin-right:12px">{{ request.session.get("email") }}</span>{% endif %}
-    {% if request.session.get("user_id") %}<a href="/account/change-password">Change password</a>{% if request.session.get("role") != "administrator" %}<a href="/account/data">Account Data</a>{% endif %}{% endif %}
-    <form class="inline" method="post" action="/logout"><button class="btn secondary">Sign out</button></form>
+    {% if request.session.get("user_id") %}
+    <details class="account-menu">
+      <summary>Account</summary>
+      <div class="account-menu-panel">
+        <a href="/account/change-password">Change Password</a>
+        {% if request.session.get("role") != "administrator" %}<a href="/account/data">Account Data</a>{% endif %}
+        <form method="post" action="/logout"><button type="submit">Sign Out</button></form>
+      </div>
+    </details>
+    {% else %}
+    <form class="inline" method="post" action="/logout"><button class="btn secondary">Sign Out</button></form>
+    {% endif %}
   </div>
 </header>
 {% set is_admin = request.session.get("role", "administrator") == "administrator" %}
