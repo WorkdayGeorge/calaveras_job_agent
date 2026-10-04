@@ -90,3 +90,9 @@ def test_generation_button_waits_for_complete_manual_description():
     assert "postingDetails.value.trim().length < 100" in script
     assert 'postingDetails.addEventListener("input"' in script
     assert "updateGenerateApplicationButton();" in script
+
+
+def test_hidden_application_controls_cannot_be_overridden_by_button_css():
+    base_template = Path("web/templates/base.html").read_text()
+
+    assert "[hidden] { display:none !important; }" in base_template
