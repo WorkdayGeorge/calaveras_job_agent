@@ -5,7 +5,6 @@ const completeDetailsButton = document.getElementById("complete-details-button")
 const manualDetailsSection = document.getElementById("manual-details-section");
 const completeDetailsMessage = document.getElementById("complete-details-message");
 const completeDetailsMessageText = document.getElementById("complete-details-message-text");
-const completeDetailsJobLink = document.getElementById("complete-details-job-link");
 const COMPLETE_DETAILS_TIMEOUT_MS = 20000;
 
 function resetCompleteDetailsButton() {
@@ -46,7 +45,6 @@ if (completeDetailsForm) {
       completeDetailsMessage.hidden = false;
       if (error.name === "AbortError") {
         completeDetailsForm.hidden = true;
-        completeDetailsJobLink.style.display = "inline";
       }
       completeDetailsMessageText.textContent = error.name === "AbortError"
         ? "Complete details could not be loaded within 20 seconds. Copy the posting's description and requirements, then paste them below."
