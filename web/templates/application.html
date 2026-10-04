@@ -14,7 +14,7 @@
   </div>
 </div>
 
-{% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:18px;">{{ request.query_params.get("message") }}</div>{% endif %}
+{% if request.query_params.get("message") %}<div class="card good" style="margin-bottom:18px;">{{ request.query_params.get("message") }}{% if show_manual_details %} <a href="{{ job.apply_url }}" target="_blank" rel="noopener">Open Job Posting</a>{% endif %}</div>{% endif %}
 
 <div class="card">
   <h2 style="margin-top:0;">Full Job Description</h2>
