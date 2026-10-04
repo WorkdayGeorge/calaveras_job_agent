@@ -6,7 +6,19 @@ const manualDetailsSection = document.getElementById("manual-details-section");
 const completeDetailsMessage = document.getElementById("complete-details-message");
 const completeDetailsMessageText = document.getElementById("complete-details-message-text");
 const jobDescriptionContent = document.getElementById("job-description-content");
+const postingDetails = document.getElementById("posting-details");
+const generateApplicationButton = document.getElementById("generate-application-button");
 const COMPLETE_DETAILS_TIMEOUT_MS = 20000;
+
+function updateGenerateApplicationButton() {
+  if (postingDetails && generateApplicationButton) {
+    generateApplicationButton.hidden = postingDetails.value.trim().length < 100;
+  }
+}
+
+if (postingDetails) {
+  postingDetails.addEventListener("input", updateGenerateApplicationButton);
+}
 
 function resetCompleteDetailsButton() {
   if (completeDetailsButton) {
@@ -52,4 +64,9 @@ if (completeDetailsForm) {
   });
 }
 
-window.addEventListener("pageshow", resetCompleteDetailsButton);
+window.addEventListener("pageshow", function () {
+  resetCompleteDetailsButton();
+  updateGenerateApplicationButton();
+});
+
+updateGenerateApplicationButton();

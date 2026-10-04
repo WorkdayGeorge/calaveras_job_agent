@@ -20,12 +20,13 @@ def test_application_prep_shows_full_job_details():
     assert "A complete description was not supplied" in template
     assert "Show Complete Details" in template
     assert 'action="/jobs/{{ job.id }}/description/expand"' in template
-    assert '<script src="/static/application-details.js?v=20261003-3" defer></script>' in template
+    assert '<script src="/static/application-details.js?v=20261003-4" defer></script>' in template
 
     script = Path("web/static/application-details.js").read_text()
     assert 'button.textContent = "Loading Details…"' not in script
     assert 'completeDetailsButton.textContent = "Loading Details…"' in script
-    assert 'window.addEventListener("pageshow", resetCompleteDetailsButton)' in script
+    assert 'window.addEventListener("pageshow", function ()' in script
+    assert "resetCompleteDetailsButton();" in script
     assert "Paste Complete Posting Details" not in template
     assert "Pull Description from Job Posting and Paste Below" in template
     assert 'action="/jobs/{{ job.id }}/description/manual"' in template
@@ -74,7 +75,18 @@ def test_application_prep_action_colors():
     template = Path("web/templates/application.html").read_text()
 
     assert 'id="complete-details-button" class="btn"' in template
-    assert (
-        'class="btn good" type="submit" style="margin-top:12px;">'
-        "Generate Resume and Cover Letter</button>"
-    ) in template
+    assert 'id="generate-application-button" class="btn good"' in template
+    assert "Generate Resume and Cover Letter</button>" in template
+
+
+def test_generation_button_waits_for_complete_manual_description():
+    template = Path("web/templates/application.html").read_text()
+    script = Path("web/static/application-details.js").read_text()
+
+    assert 'id="posting-details"' in template
+    assert 'minlength="100"' in template
+    assert 'id="generate-application-button"' in template
+    assert "state.manual_job_description|trim|length < 100" in template
+    assert "postingDetails.value.trim().length < 100" in script
+    assert 'postingDetails.addEventListener("input"' in script
+    assert "updateGenerateApplicationButton();" in script
