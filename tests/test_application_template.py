@@ -42,7 +42,9 @@ def test_application_prep_shows_full_job_details():
     manual_section = template.split('id="manual-details-section"', 1)[1]
     assert 'href="{{ job.apply_url }}"' in manual_section
     assert 'class="btn"' in manual_section
-    assert ">Pull Description from Job Posting and Paste Below</a>" in manual_section
+    assert "Pull Description from Job Posting and Paste Below" in manual_section
+    assert "state and state.manual_job_description" in manual_section
+    assert "Apply" in manual_section
     assert "Complete details could not be loaded. Copy the posting's" not in manual_section
     assert "request.query_params.get(\"message\") and not show_manual_details" in template
     assert "{% if show_manual_details %} hidden{% endif %}" in template
@@ -66,3 +68,13 @@ def test_manual_posting_save_triggers_package_generation():
     assert "state.manual_job_description = details" in manual_handler
     assert "session.commit()" in manual_handler
     assert "return build_application_package(job_id, request)" in manual_handler
+
+
+def test_application_prep_action_colors():
+    template = Path("web/templates/application.html").read_text()
+
+    assert 'id="complete-details-button" class="btn"' in template
+    assert (
+        'class="btn good" type="submit" style="margin-top:12px;">'
+        "Generate Resume and Cover Letter</button>"
+    ) in template
