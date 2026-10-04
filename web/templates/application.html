@@ -28,6 +28,7 @@
     {% if job.posted_at %}{% if job.employment_type %} &mdash; {% endif %}Posted {{ job.posted_at|pacific_time }}{% endif %}
     {% if job.source %}{% if job.employment_type or job.posted_at %} &mdash; {% endif %}Source: {{ job.source|replace('_', ' ')|title }}{% endif %}
   </div>
+  <div id="job-description-content"{% if show_manual_details %} hidden{% endif %}>
   {% if job.description %}
     <div style="white-space:pre-wrap; line-height:1.6; margin-top:18px;">{{ job.description }}</div>
   {% else %}
@@ -39,6 +40,7 @@
       {% for requirement in job.requirements %}<li style="margin-bottom:8px;">{{ requirement }}</li>{% endfor %}
     </ul>
   {% endif %}
+  </div>
   <form id="complete-details-form" method="post" action="/jobs/{{ job.id }}/description/expand" style="margin-top:18px;"{% if show_manual_details %} hidden{% endif %}>
     <button id="complete-details-button" class="btn secondary" type="submit">Show Complete Details</button>
   </form>
@@ -128,6 +130,6 @@
 {% endif %}
 {% endif %}
 
-<script src="/static/application-details.js?v=20261003-2" defer></script>
+<script src="/static/application-details.js?v=20261003-3" defer></script>
 
 {% endblock %}
