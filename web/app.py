@@ -1641,7 +1641,11 @@ def save_manual_job_description(
 
 
 @app.post("/jobs/{job_id}/application/build")
-def build_application_package(\n    job_id: str,\n    request: Request,\n    posting_details: str = Form(""),\n):
+def build_application_package(
+    job_id: str,
+    request: Request,
+    posting_details: str = Form(""),
+):
     denial = require_auth(request)
     if denial:
         return denial
