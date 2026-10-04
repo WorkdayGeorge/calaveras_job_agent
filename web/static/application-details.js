@@ -8,6 +8,7 @@ const completeDetailsMessageText = document.getElementById("complete-details-mes
 const jobDescriptionContent = document.getElementById("job-description-content");
 const postingDetails = document.getElementById("posting-details");
 const generateApplicationButton = document.getElementById("generate-application-button");
+const generateApplicationForm = generateApplicationButton ? generateApplicationButton.form : null;
 const COMPLETE_DETAILS_TIMEOUT_MS = 20000;
 
 function updateGenerateApplicationButton() {
@@ -16,8 +17,24 @@ function updateGenerateApplicationButton() {
   }
 }
 
+function resetGenerateApplicationButton() {
+  if (generateApplicationButton) {
+    generateApplicationButton.disabled = false;
+    generateApplicationButton.textContent = "Generate Resume and Cover Letter";
+    generateApplicationButton.removeAttribute("aria-busy");
+  }
+}
+
 if (postingDetails) {
   postingDetails.addEventListener("input", updateGenerateApplicationButton);
+}
+
+if (generateApplicationForm) {
+  generateApplicationForm.addEventListener("submit", function () {
+    generateApplicationButton.disabled = true;
+    generateApplicationButton.textContent = "Generating Resume and Cover Letter…";
+    generateApplicationButton.setAttribute("aria-busy", "true");
+  });
 }
 
 function resetCompleteDetailsButton() {
@@ -66,6 +83,7 @@ if (completeDetailsForm) {
 
 window.addEventListener("pageshow", function () {
   resetCompleteDetailsButton();
+  resetGenerateApplicationButton();
   updateGenerateApplicationButton();
 });
 
