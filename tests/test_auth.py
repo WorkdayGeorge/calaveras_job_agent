@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import UUID
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -7,6 +8,7 @@ from job_agent.models import AuthToken, Base, User, UserPreference
 from web.auth import (
     bootstrap_admin,
     consume_token,
+    find_user_by_email,
     hash_password,
     issue_token,
     normalize_login_email,
@@ -193,3 +195,45 @@ def test_temporary_password_forces_change_and_clears_lockout():
     assert user.failed_login_attempts == 0
     assert user.locked_until is None
     assert verify_password("new-temporary-password", user.password_hash)
+
+
+def test_user_id_is_generated_as_uuid():
+    session = make_session()
+    user = make_user(session)
+
+    assert str(UUID(user.id)) == user.id
+
+
+def test_email_lookup_and_collision_are_case_insensitive():
+    session = make_session()
+    user = make_user(session)
+
+    assert find_user_by_email(session, "PERSON@EXAMPLE.COM").id == user.id
+
+    now = datetime.now(timezone.utc)
+    other = User(
+        email="other@example.com",
+        display_name=user.display_name,
+        password_hash=hash_password("temporary-passphrase"),
+        role="user",
+        status="active",
+        must_change_password=True,
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(other)
+    session.commit()
+
+    try:
+        update_user_identity(
+            session,
+            other,
+            "PERSON@EXAMPLE.COM",
+            user.display_name,
+        )
+        assert False, "Expected case-insensitive duplicate email rejection"
+    except ValueError as exc:
+        assert "another account" in str(exc)
+
+    assert other.id != user.id
+    assert other.display_name == user.display_name
