@@ -72,7 +72,7 @@
   </div>
   <div>
     {% if request.session.get("email") %}<span style="margin-right:12px">{{ request.session.get("email") }}</span>{% endif %}
-    {% if request.session.get("user_id") %}<a href="/account/change-password">Change password</a>{% endif %}
+    {% if request.session.get("user_id") %}<a href="/account/change-password">Change password</a>{% if request.session.get("role") != "administrator" %}<a href="/account/data">Account Data</a>{% endif %}{% endif %}
     <form class="inline" method="post" action="/logout"><button class="btn secondary">Sign out</button></form>
   </div>
 </header>
