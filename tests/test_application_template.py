@@ -26,7 +26,8 @@ def test_application_prep_shows_full_job_details():
     assert 'button.textContent = "Loading Details…"' not in script
     assert 'completeDetailsButton.textContent = "Loading Details…"' in script
     assert 'window.addEventListener("pageshow", resetCompleteDetailsButton)' in script
-    assert "Paste Complete Posting Details" in template
+    assert "Paste Complete Posting Details" not in template
+    assert "Pull Description from Job Posting and Paste Below" in template
     assert 'action="/jobs/{{ job.id }}/description/manual"' in template
     assert "state.manual_job_description" in template
     assert 'id="manual-details-section"' in template
@@ -39,7 +40,7 @@ def test_application_prep_shows_full_job_details():
     manual_section = template.split('id="manual-details-section"', 1)[1]
     assert 'href="{{ job.apply_url }}"' in manual_section
     assert 'class="btn"' in manual_section
-    assert ">Open Job Posting</a>" in manual_section
+    assert ">Pull Description from Job Posting and Paste Below</a>" in manual_section
     assert "Complete details could not be loaded. Copy the posting's" not in manual_section
     assert "request.query_params.get(\"message\") and not show_manual_details" in template
     assert "{% if show_manual_details %} hidden{% endif %}" in template
