@@ -1620,13 +1620,7 @@ def save_manual_job_description(
             state.manual_job_description = details
             state.updated_at = datetime.now(timezone.utc)
             session.commit()
-            destination = request.url_for("application_page", job_id=job.id)
-        return RedirectResponse(
-            destination.include_query_params(
-                message="Posting details saved and will be used for application tailoring."
-            ),
-            status_code=303,
-        )
+        return build_application_package(job_id, request)
 
     with SessionLocal() as session:
         job = get_assigned_job(session, job_id, request)

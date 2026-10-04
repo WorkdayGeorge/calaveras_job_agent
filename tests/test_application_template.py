@@ -29,6 +29,8 @@ def test_application_prep_shows_full_job_details():
     assert "Paste Complete Posting Details" not in template
     assert "Pull Description from Job Posting and Paste Below" in template
     assert 'action="/jobs/{{ job.id }}/description/manual"' in template
+    assert "Generate Resume and Cover Letter" in template
+    assert "Save Posting Details" not in template
     assert "state.manual_job_description" in template
     assert 'id="manual-details-section"' in template
     assert "{% if not show_manual_details %} hidden{% endif %}" in template
@@ -49,3 +51,18 @@ def test_application_prep_shows_full_job_details():
     assert 'jobDescriptionContent.hidden = true' in script
     header = template.split('{% if request.query_params.get("message")', 1)[0]
     assert 'href="{{ job.apply_url }}"' not in header
+
+
+def test_manual_posting_save_triggers_package_generation():
+    app_source = Path("web/app.py").read_text()
+
+    manual_handler = app_source.split(
+        'def save_manual_job_description(',
+        1,
+    )[1].split(
+        '@app.post("/jobs/{job_id}/application/build")',
+        1,
+    )[0]
+    assert "state.manual_job_description = details" in manual_handler
+    assert "session.commit()" in manual_handler
+    assert "return build_application_package(job_id, request)" in manual_handler

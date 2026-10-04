@@ -50,7 +50,7 @@
   <form method="post" action="/jobs/{{ job.id }}/description/manual">
     <label for="posting-details">Job description and requirements</label>
     <textarea id="posting-details" name="posting_details" rows="12" maxlength="100000" required placeholder="Paste the complete job posting here...">{{ state.manual_job_description if state and state.manual_job_description else '' }}</textarea>
-    <button class="btn secondary" type="submit" style="margin-top:12px;">Save Posting Details</button>
+    <button class="btn secondary" type="submit" style="margin-top:12px;">Generate Resume and Cover Letter</button>
   </form>
   </section>
 </div>
