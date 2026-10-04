@@ -62,6 +62,21 @@ def init_db() -> None:
                 "ADD COLUMN description_expanded BOOLEAN DEFAULT FALSE NOT NULL"
             ))
 
+        duplicate_email = connection.execute(text(
+            "SELECT LOWER(TRIM(email)) AS normalized_email "
+            "FROM users GROUP BY LOWER(TRIM(email)) HAVING COUNT(*) > 1 LIMIT 1"
+        )).scalar()
+        if duplicate_email:
+            raise RuntimeError(
+                "Duplicate login emails must be resolved before startup: "
+                + str(duplicate_email)
+            )
+        connection.execute(text("UPDATE users SET email = LOWER(TRIM(email))"))
+        connection.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email_lower_idx "
+            "ON users (LOWER(email))"
+        ))
+
     if engine.dialect.name == "postgresql":
         columns = {
             column["name"]: column
