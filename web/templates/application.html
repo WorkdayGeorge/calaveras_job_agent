@@ -46,8 +46,7 @@
   </form>
   <div id="complete-details-message" class="card warn" style="margin-top:16px;" hidden><span id="complete-details-message-text"></span></div>
   <section id="manual-details-section"{% if not show_manual_details %} hidden{% endif %}>
-  <h3 style="margin-top:24px;">Paste Complete Posting Details</h3>
-  <a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener" style="margin-bottom:12px;">Open Job Posting</a>
+  <a class="btn" href="{{ job.apply_url }}" target="_blank" rel="noopener" style="margin-bottom:12px;">Pull Description from Job Posting and Paste Below</a>
   <form method="post" action="/jobs/{{ job.id }}/description/manual">
     <label for="posting-details">Job description and requirements</label>
     <textarea id="posting-details" name="posting_details" rows="12" maxlength="100000" required placeholder="Paste the complete job posting here...">{{ state.manual_job_description if state and state.manual_job_description else '' }}</textarea>
