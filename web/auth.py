@@ -6,10 +6,10 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
 from job_agent.config import env
-from job_agent.models import AuditEvent, AuthToken, User, UserPreference
+from job_agent.models import AuditEvent, AuthToken, User, UserPreference, uuid_str
 from job_agent.notify import normalize_email_address
 
 
@@ -54,7 +54,7 @@ def find_user_by_email(session, email: str | None) -> User | None:
     normalized = normalize_login_email(email)
     if not normalized:
         return None
-    return session.scalar(select(User).where(User.email == normalized))
+    return session.scalar(select(User).where(func.lower(User.email) == normalized))
 
 
 def bootstrap_admin(session) -> User | None:
@@ -62,7 +62,7 @@ def bootstrap_admin(session) -> User | None:
     if existing:
         configured_email = normalize_login_email(env("ADMIN_EMAIL"))
         if configured_email and configured_email != existing.email:
-            collision = session.scalar(select(User).where(User.email == configured_email))
+            collision = session.scalar(select(User).where(func.lower(User.email) == configured_email))
             if not collision:
                 existing.email = configured_email
                 existing.display_name = env("ADMIN_DISPLAY_NAME", existing.display_name)
@@ -77,6 +77,7 @@ def bootstrap_admin(session) -> User | None:
 
     now = datetime.now(timezone.utc)
     admin = User(
+        id=uuid_str(),
         email=email,
         display_name=env("ADMIN_DISPLAY_NAME", "Administrator"),
         password_hash=hash_password(password),
@@ -184,7 +185,7 @@ def update_user_identity(session, user: User, email: str, display_name: str) -> 
     if not normalized:
         raise ValueError("Enter a valid email address.")
     collision = session.scalar(
-        select(User).where(User.email == normalized, User.id != user.id)
+        select(User).where(func.lower(User.email) == normalized, User.id != user.id)
     )
     if collision:
         raise ValueError("That email address already belongs to another account.")
