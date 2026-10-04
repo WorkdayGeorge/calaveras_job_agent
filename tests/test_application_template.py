@@ -20,7 +20,7 @@ def test_application_prep_shows_full_job_details():
     assert "A complete description was not supplied" in template
     assert "Show Complete Details" in template
     assert 'action="/jobs/{{ job.id }}/description/expand"' in template
-    assert '<script src="/static/application-details.js?v=20261003-2" defer></script>' in template
+    assert '<script src="/static/application-details.js?v=20261003-3" defer></script>' in template
 
     script = Path("web/static/application-details.js").read_text()
     assert 'button.textContent = "Loading Details…"' not in script
@@ -44,5 +44,7 @@ def test_application_prep_shows_full_job_details():
     assert "request.query_params.get(\"message\") and not show_manual_details" in template
     assert "{% if show_manual_details %} hidden{% endif %}" in template
     assert "completeDetailsMessage.hidden = true" in script
+    assert 'id="job-description-content"' in template
+    assert 'jobDescriptionContent.hidden = true' in script
     header = template.split('{% if request.query_params.get("message")', 1)[0]
     assert 'href="{{ job.apply_url }}"' not in header
