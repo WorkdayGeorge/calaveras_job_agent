@@ -34,7 +34,6 @@ from job_agent.user_data import assign_legacy_records_to_admin, get_or_create_jo
 from job_agent.profile_store import (
     empty_candidate_profile,
     ensure_user_profile_records,
-    profile_identity_matches,
     seed_admin_profile,
     search_term_alignment,
     structured_candidate_profile,
@@ -2682,16 +2681,9 @@ def resume_profile_suggestion(asset_id: str, request: Request):
                 resume_text = extract_resume_text(asset.filename, resume_content)
                 asset.extracted_text = resume_text
                 session.commit()
+            if asset.user_id != user.id or profile.user_id != user.id:
+                return HTMLResponse("Profile ownership mismatch", status_code=409)
             merge_profile = profile.profile_data
-            if not profile_identity_matches(
-                profile.profile_data.get("name"),
-                user.display_name,
-            ):
-                merge_profile = empty_candidate_profile(user)
-                identity_warning = (
-                    "The saved profile belonged to a different candidate and "
-                    "was not used as the basis for this suggestion."
-                )
             proposal = propose_profile_from_resume(
                 resume_text,
                 merge_profile,
