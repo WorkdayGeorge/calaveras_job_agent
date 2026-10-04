@@ -8,11 +8,11 @@
 <div class="card">
   <h2 style="margin-top:0">Confirm {{ "candidate-data reset" if pending_action == "reset" else "account deletion" }}</h2>
   <p>Enter the six-digit code sent to {{ user.email }}.</p>
-  <form method="post" action="/account/data/confirm">
+  <form class="account-action-form" method="post" action="/account/data/confirm">
     <input type="hidden" name="action" value="{{ pending_action }}">
     <label>Verification code</label>
     <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
-    <button class="btn danger" style="margin-top:12px">Confirm</button>
+    <button class="btn danger" style="margin-top:12px" data-processing-text="Processing…">Confirm</button>
   </form>
 </div>
 {% else %}
@@ -20,23 +20,51 @@
   <h2 style="margin-top:0">Reset Candidate Data</h2>
   <p>Recommended when resume or profile information belongs to the wrong person. Your login, email, password, and Account ID remain unchanged.</p>
   <p class="muted">This removes {{ summary.resumes }} resume(s), {{ summary.application_packages }} generated package(s), {{ summary.evaluations }} score(s), {{ summary.search_terms }} search term(s), candidate profile information, application tracking, and application-assistant answers.</p>
-  <form method="post" action="/account/data/request">
+  <form class="account-action-form" method="post" action="/account/data/request">
     <input type="hidden" name="action" value="reset">
     <label>Current password</label><input type="password" name="password" required>
     <label>Type RESET to continue</label><input name="confirmation" pattern="RESET" required>
-    <button class="btn danger" style="margin-top:12px">Reset Candidate Data</button>
+    <button class="btn danger" style="margin-top:12px" data-processing-text="Resetting Candidate Data…">Reset Candidate Data</button>
   </form>
 </div>
 
 <div class="card" style="margin-top:18px">
   <h2 style="margin-top:0">Delete My Account</h2>
   <p>Permanently deletes this non-administrator account and its stored data. Your administrator must send a new invitation before the same email can be used again.</p>
-  <form method="post" action="/account/data/request">
+  <form class="account-action-form" method="post" action="/account/data/request">
     <input type="hidden" name="action" value="delete">
     <label>Current password</label><input type="password" name="password" required>
     <label>Type DELETE to continue</label><input name="confirmation" pattern="DELETE" required>
-    <button class="btn danger" style="margin-top:12px">Delete My Account</button>
+    <button class="btn danger" style="margin-top:12px" data-processing-text="Deleting Account…">Delete My Account</button>
   </form>
 </div>
 {% endif %}
+<script>
+(function () {
+  const forms = document.querySelectorAll(".account-action-form");
+
+  function resetButtons() {
+    forms.forEach(function (form) {
+      const button = form.querySelector("button[type='submit'], button:not([type])");
+      if (!button) return;
+      button.disabled = false;
+      button.removeAttribute("aria-busy");
+      if (button.dataset.originalText) button.textContent = button.dataset.originalText;
+    });
+  }
+
+  forms.forEach(function (form) {
+    form.addEventListener("submit", function () {
+      const button = form.querySelector("button[type='submit'], button:not([type])");
+      if (!button) return;
+      button.dataset.originalText = button.textContent;
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      button.textContent = button.dataset.processingText || "Processing…";
+    });
+  });
+
+  window.addEventListener("pageshow", resetButtons);
+})();
+</script>
 {% endblock %}

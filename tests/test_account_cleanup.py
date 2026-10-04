@@ -107,3 +107,8 @@ def test_account_data_page_requires_password_code_and_explicit_confirmation():
     assert 'pattern="RESET"' in template
     assert 'pattern="DELETE"' in template
     assert "Account ID" in template
+    assert 'class="account-action-form"' in template
+    assert 'data-processing-text="Resetting Candidate Data…"' in template
+    assert 'data-processing-text="Deleting Account…"' in template
+    assert 'button.disabled = true' in template
+    assert 'window.addEventListener("pageshow", resetButtons)' in template
