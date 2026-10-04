@@ -36,8 +36,8 @@ def test_application_prep_shows_full_job_details():
     assert "controller.abort()" in script
     assert "manualDetailsSection.hidden = false" in script
     assert "completeDetailsForm.hidden = true" in script
-    assert 'id="complete-details-job-link"' in template
-    assert "{% if show_manual_details %} <a href=\"{{ job.apply_url }}\"" in template
-    assert 'completeDetailsJobLink.style.display = "inline"' in script
+    manual_section = template.split('id="manual-details-section"', 1)[1]
+    assert 'href="{{ job.apply_url }}"' in manual_section
+    assert "Open Job Posting" in manual_section
     header = template.split('{% if request.query_params.get("message") %}', 1)[0]
     assert "Open Job Posting" not in header
