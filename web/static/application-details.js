@@ -5,6 +5,7 @@ const completeDetailsButton = document.getElementById("complete-details-button")
 const manualDetailsSection = document.getElementById("manual-details-section");
 const completeDetailsMessage = document.getElementById("complete-details-message");
 const completeDetailsMessageText = document.getElementById("complete-details-message-text");
+const jobDescriptionContent = document.getElementById("job-description-content");
 const COMPLETE_DETAILS_TIMEOUT_MS = 20000;
 
 function resetCompleteDetailsButton() {
@@ -45,6 +46,7 @@ if (completeDetailsForm) {
       completeDetailsForm.hidden = true;
       completeDetailsMessage.hidden = true;
       completeDetailsMessageText.textContent = "";
+      jobDescriptionContent.hidden = true;
       resetCompleteDetailsButton();
     }
   });
