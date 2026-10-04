@@ -42,13 +42,9 @@ if (completeDetailsForm) {
     } catch (error) {
       window.clearTimeout(timeout);
       manualDetailsSection.hidden = false;
-      completeDetailsMessage.hidden = false;
-      if (error.name === "AbortError") {
-        completeDetailsForm.hidden = true;
-      }
-      completeDetailsMessageText.textContent = error.name === "AbortError"
-        ? "Complete details could not be loaded within 20 seconds. Copy the posting's description and requirements, then paste them below."
-        : "Complete details could not be loaded. Paste the posting's description and requirements below.";
+      completeDetailsForm.hidden = true;
+      completeDetailsMessage.hidden = true;
+      completeDetailsMessageText.textContent = "";
       resetCompleteDetailsButton();
     }
   });

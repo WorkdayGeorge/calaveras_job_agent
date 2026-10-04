@@ -38,8 +38,11 @@ def test_application_prep_shows_full_job_details():
     assert "completeDetailsForm.hidden = true" in script
     manual_section = template.split('id="manual-details-section"', 1)[1]
     assert 'href="{{ job.apply_url }}"' in manual_section
-    assert 'class="btn secondary"' in manual_section
+    assert 'class="btn"' in manual_section
     assert ">Open Job Posting</a>" in manual_section
     assert "Complete details could not be loaded. Copy the posting's" not in manual_section
-    header = template.split('{% if request.query_params.get("message") %}', 1)[0]
-    assert "Open Job Posting" not in header
+    assert "request.query_params.get(\"message\") and not show_manual_details" in template
+    assert "{% if show_manual_details %} hidden{% endif %}" in template
+    assert "completeDetailsMessage.hidden = true" in script
+    header = template.split('{% if request.query_params.get("message")', 1)[0]
+    assert 'href="{{ job.apply_url }}"' not in header
