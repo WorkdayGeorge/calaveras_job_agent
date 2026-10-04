@@ -21,7 +21,7 @@ from job_agent.db import init_db, SessionLocal
 from job_agent.models import (
     Job, Evaluation, SearchTerm, RunLog, ResumeAsset, ApplicationPackage,
     User, UserJobState, CandidateProfile, UserPreference, Notification, AuditEvent,
-    UserSearchTerm, UserJobMatch, AuthToken, UserOnboarding,
+    UserSearchTerm, UserJobMatch, AuthToken, UserOnboarding, uuid_str,
 )
 from job_agent.application_builder import build_application_materials
 from job_agent.source_catalog import get_employer_coverage, get_job_sources
@@ -2098,6 +2098,7 @@ def create_user(
             return RedirectResponse("/admin/users?message=That+email+already+exists", status_code=303)
         now = datetime.now(timezone.utc)
         user = User(
+            id=uuid_str(),
             email=normalized_email,
             display_name=display_name.strip() or normalized_email,
             password_hash=hash_password(secrets.token_urlsafe(32)),
