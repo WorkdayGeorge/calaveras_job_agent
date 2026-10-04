@@ -20,7 +20,7 @@ def test_application_prep_shows_full_job_details():
     assert "A complete description was not supplied" in template
     assert "Show Complete Details" in template
     assert 'action="/jobs/{{ job.id }}/description/expand"' in template
-    assert '<script src="/static/application-details.js?v=20261003-4" defer></script>' in template
+    assert '<script src="/static/application-details.js?v=20261003-5" defer></script>' in template
 
     script = Path("web/static/application-details.js").read_text()
     assert 'button.textContent = "Loading Details…"' not in script
@@ -90,6 +90,11 @@ def test_generation_button_waits_for_complete_manual_description():
     assert "postingDetails.value.trim().length < 100" in script
     assert 'postingDetails.addEventListener("input"' in script
     assert "updateGenerateApplicationButton();" in script
+    assert 'generateApplicationForm.addEventListener("submit"' in script
+    assert 'generateApplicationButton.disabled = true' in script
+    assert 'generateApplicationButton.textContent = "Generating Resume and Cover Letter…"' in script
+    assert 'generateApplicationButton.setAttribute("aria-busy", "true")' in script
+    assert "resetGenerateApplicationButton();" in script
 
 
 def test_hidden_application_controls_cannot_be_overridden_by_button_css():
