@@ -7,6 +7,7 @@ from sqlalchemy import or_, select
 from .models import Job
 
 
+# Keep these labels stable because they are stored on existing job records.
 OCCUPATION_CATEGORIES = (
     "Accounting & Bookkeeping",
     "Administrative & Office Support",
