@@ -48,6 +48,12 @@ from job_agent.profile_store import (
 from job_agent.profile_extractor import propose_profile_from_resume
 from job_agent.resume_search_terms import propose_search_terms_from_resume
 from job_agent.job_detail_fetcher import JobDetailError, fetch_job_description
+from job_agent.job_categories import (
+    JOB_CATEGORY_FILTERS,
+    REMOTE_CATEGORY,
+    WORK_ARRANGEMENTS,
+    backfill_job_classifications,
+)
 from job_agent.analytics import build_admin_analytics, resolve_date_range
 from job_agent.preflight import production_readiness
 from job_agent.backfill import backfill_progress, request_backfill
@@ -177,7 +183,12 @@ def job_search_clause(query: str | None):
     )
 
 
-def administrator_job_rows(session, sort_by: str = "newest_posted"):
+def administrator_job_rows(
+    session,
+    sort_by: str = "newest_posted",
+    category: str = "",
+    arrangement: str = "",
+):
     """Return jobs with current, cross-user fit and application metrics."""
     assignments = (
         select(
@@ -272,6 +283,13 @@ def administrator_job_rows(session, sort_by: str = "newest_posted"):
         # which has no PostgreSQL equality operator.
         .group_by(Job.id)
     )
+
+    if category == REMOTE_CATEGORY:
+        stmt = stmt.where(Job.work_arrangement == "remote")
+    elif category in JOB_CATEGORY_FILTERS:
+        stmt = stmt.where(Job.category == category)
+    if arrangement in WORK_ARRANGEMENTS:
+        stmt = stmt.where(Job.work_arrangement == arrangement)
 
     if sort_by == "highest_fit":
         stmt = stmt.order_by(best_fit.desc().nullslast(), Job.posted_at.desc().nullslast())
@@ -599,6 +617,7 @@ def startup():
             get_setting(session, "alert_email_to", env("ALERT_EMAIL_TO", "")),
         )
         seed_legacy_job_matches(session)
+        backfill_job_classifications(session)
 
 @app.get("/health")
 def health():
@@ -1325,13 +1344,19 @@ def jobs_page(
     status: str | None = None,
     sort: str = "newest_posted",
     q: str = "",
+    category: str = "",
+    arrangement: str = "",
 ):
     denial = require_auth(request)
     if denial:
         return denial
     with SessionLocal() as session:
+        selected_category = category if category in JOB_CATEGORY_FILTERS else ""
+        selected_arrangement = arrangement if arrangement in WORK_ARRANGEMENTS else ""
         if admin_user(request):
-            rows = administrator_job_rows(session, sort)
+            rows = administrator_job_rows(
+                session, sort, selected_category, selected_arrangement
+            )
             return templates.TemplateResponse(
                 request,
                 "jobs.html",
@@ -1340,6 +1365,10 @@ def jobs_page(
                     "status_filter": None,
                     "sort_by": sort,
                     "search_query": "",
+                    "category_options": JOB_CATEGORY_FILTERS,
+                    "selected_category": selected_category,
+                    "arrangement_options": WORK_ARRANGEMENTS,
+                    "selected_arrangement": selected_arrangement,
                     "administrator_view": True,
                 },
             )
@@ -1377,6 +1406,12 @@ def jobs_page(
         search_clause = job_search_clause(q)
         if search_clause is not None:
             stmt = stmt.where(search_clause)
+        if selected_category == REMOTE_CATEGORY:
+            stmt = stmt.where(Job.work_arrangement == "remote")
+        elif selected_category:
+            stmt = stmt.where(Job.category == selected_category)
+        if selected_arrangement:
+            stmt = stmt.where(Job.work_arrangement == selected_arrangement)
         rows = session.execute(stmt.limit(250)).all()
     return templates.TemplateResponse(
         request,
@@ -1386,6 +1421,10 @@ def jobs_page(
             "status_filter": status,
             "sort_by": sort,
             "search_query": " ".join(q.split()).strip()[:100],
+            "category_options": JOB_CATEGORY_FILTERS,
+            "selected_category": selected_category,
+            "arrangement_options": WORK_ARRANGEMENTS,
+            "selected_arrangement": selected_arrangement,
             "administrator_view": False,
         }
     )
