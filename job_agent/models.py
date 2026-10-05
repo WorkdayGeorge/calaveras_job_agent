@@ -85,6 +85,8 @@ class Job(Base):
     company: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[str | None] = mapped_column(Text)
     employment_type: Mapped[str | None] = mapped_column(String(100))
+    category: Mapped[str | None] = mapped_column(String(100), default=None)
+    work_arrangement: Mapped[str | None] = mapped_column(String(20), default=None)
     description: Mapped[str | None] = mapped_column(Text)
     description_expanded: Mapped[bool] = mapped_column(Boolean, default=False)
     requirements: Mapped[list] = mapped_column(JSON, default=list)
