@@ -37,7 +37,7 @@
       <select id="arrangement" name="arrangement">
         <option value="">Any arrangement</option>
         {% for option in arrangement_options %}
-        <option value="{{ option }}" {% if selected_arrangement == option %}selected{% endif %}>{{ option|title }}</option>
+        <option value="{{ option }}" {% if selected_arrangement == option %}selected{% endif %}>{{ "On-site" if option == "onsite" else option|title }}</option>
         {% endfor %}
       </select>
     </div>
@@ -61,7 +61,7 @@
 <tr><th>Job</th><th>Posted</th><th>User Fit</th><th>Apply Activity</th><th>Actions</th></tr>
 {% for job, assigned_users, evaluated_users, best_fit, average_fit, strong_fits, apply_recommendations, notified_users, applied_users in rows %}
 <tr>
-<td><strong>{{ job.title }}</strong><br>{{ job.company }}<br><span class="muted">{{ job.location or "—" }}</span><br><small>{{ job.category or "Uncategorized" }} · {{ (job.work_arrangement or "onsite")|title }}</small></td>
+<td><strong>{{ job.title }}</strong><br>{{ job.company }}<br><span class="muted">{{ job.location or "—" }}</span><br><small>{{ job.category or "Uncategorized" }} · {{ "On-site" if (job.work_arrangement or "onsite") == "onsite" else (job.work_arrangement or "onsite")|title }}</small></td>
 <td>{{ job.posted_at|pacific_time if job.posted_at else "Unverified" }}<br><span class="muted">{{ job.freshness_status }}</span></td>
 <td>
   {% if evaluated_users %}
