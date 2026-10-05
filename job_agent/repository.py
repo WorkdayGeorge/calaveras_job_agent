@@ -18,6 +18,8 @@ def upsert_job(session: Session, item: NormalizedJob) -> tuple[Job, bool]:
         existing.freshness_status = item.freshness_status
         existing.posted_time_confidence = item.posted_time_confidence
         existing.is_local = item.is_local
+        existing.category = item.category
+        existing.work_arrangement = item.work_arrangement
         session.commit()
         return existing, False
 
@@ -27,6 +29,8 @@ def upsert_job(session: Session, item: NormalizedJob) -> tuple[Job, bool]:
         company=item.company,
         location=item.location,
         employment_type=item.employment_type,
+        category=item.category,
+        work_arrangement=item.work_arrangement,
         description=item.description,
         requirements=item.requirements,
         posted_at=item.posted_at,
