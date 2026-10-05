@@ -61,6 +61,14 @@ def init_db() -> None:
                 "ALTER TABLE jobs "
                 "ADD COLUMN description_expanded BOOLEAN DEFAULT FALSE NOT NULL"
             ))
+        if "category" not in job_columns:
+            connection.execute(text(
+                "ALTER TABLE jobs ADD COLUMN category VARCHAR(100)"
+            ))
+        if "work_arrangement" not in job_columns:
+            connection.execute(text(
+                "ALTER TABLE jobs ADD COLUMN work_arrangement VARCHAR(20)"
+            ))
 
         duplicate_email = connection.execute(text(
             "SELECT LOWER(TRIM(email)) AS normalized_email "
