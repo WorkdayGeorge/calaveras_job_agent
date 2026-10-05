@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit
 
 from .schemas import RawJob, NormalizedJob
+from .job_categories import categorize_job, classify_work_arrangement
 
 TRACKING_PREFIXES = ("utm_", "sar_id", "jpos", "ref", "source")
 
@@ -67,12 +68,20 @@ def freshness_status(posted_at: datetime | None, settings: dict, now: datetime |
 
 def normalize_job(raw: RawJob, settings: dict, now: datetime | None = None) -> NormalizedJob:
     freshness, confidence = freshness_status(raw.posted_at, settings, now=now)
+    category = categorize_job(
+        raw.title, raw.company, raw.description, raw.requirements, raw.source
+    )
+    work_arrangement = classify_work_arrangement(
+        raw.title, raw.location, raw.description
+    )
     return NormalizedJob(
         provider_job_id=raw.provider_job_id,
         title=clean_text(raw.title),
         company=clean_text(raw.company),
         location=clean_text(raw.location) or None,
         employment_type=clean_text(raw.employment_type) or None,
+        category=category,
+        work_arrangement=work_arrangement,
         description=clean_text(raw.description) or None,
         requirements=[clean_text(x) for x in raw.requirements if clean_text(x)],
         posted_at=raw.posted_at,
