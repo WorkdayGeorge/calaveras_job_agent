@@ -140,7 +140,7 @@ def categorize_job(
 
     source_hint = _SOURCE_CATEGORY_HINTS.get(_searchable(source).strip())
     if source_hint:
-        scores[source_hint] += 2
+        scores[source_hint] += 6
 
     best = max(OCCUPATION_CATEGORIES, key=lambda category: scores[category])
     if scores[best] == 0:
