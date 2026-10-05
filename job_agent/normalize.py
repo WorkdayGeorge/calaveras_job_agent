@@ -38,6 +38,11 @@ def is_local_location(location: str | None, settings: dict) -> bool:
     if not location:
         return False
     l = location.lower()
+    if "remote" in l and any(region in l for region in (
+        "california", "united states", "usa", "u.s.", "north america",
+        "worldwide", "anywhere", "global", "americas",
+    )):
+        return True
     primary = settings["location"]["primary"].lower()
     allowed_counties = settings["location"].get(
         "allowed_counties", ["Calaveras County"]
