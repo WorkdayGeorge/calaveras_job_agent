@@ -26,6 +26,16 @@ class NormalizeTests(unittest.TestCase):
     def test_nonlocal(self):
         self.assertFalse(is_local_location("Sonora, CA", SETTINGS))
 
+    def test_california_eligible_remote_is_in_scope(self):
+        self.assertTrue(
+            is_local_location("Remote — United States", SETTINGS)
+        )
+
+    def test_region_restricted_remote_is_not_in_scope(self):
+        self.assertFalse(
+            is_local_location("Remote — Europe only", SETTINGS)
+        )
+
     def test_amador_county_is_local(self):
         self.assertTrue(is_local_location("Jackson, Amador County, CA", SETTINGS))
 
@@ -48,6 +58,8 @@ class NormalizeTests(unittest.TestCase):
         j = normalize_job(raw, SETTINGS, now=now)
         self.assertEqual(j.freshness_status, "verified_fresh")
         self.assertEqual(j.posted_time_confidence, "verified")
+        self.assertEqual(j.category, "Accounting & Bookkeeping")
+        self.assertEqual(j.work_arrangement, "onsite")
 
 if __name__ == "__main__":
     unittest.main()

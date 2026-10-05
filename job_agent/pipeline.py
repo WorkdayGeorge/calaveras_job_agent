@@ -11,6 +11,7 @@ from .models import Job, Evaluation, Notification, RunLog, User
 from .backfill import pending_backfill_jobs, queued_backfills, refresh_backfill
 from .user_search import enabled_user_terms, record_user_job_match
 from .normalize import normalize_job
+from .job_categories import backfill_job_classifications
 from .notify import notification_bucket, console_notify, email_notify, email_high_priority_digest
 from .providers.demo import DemoProvider
 from .providers.adzuna import AdzunaProvider
@@ -171,6 +172,8 @@ def job_to_dict(job) -> dict:
         "company": job.company,
         "location": job.location,
         "employment_type": job.employment_type,
+        "category": job.category,
+        "work_arrangement": job.work_arrangement,
         "description": job.description,
         "requirements": job.requirements or [],
         "posted_at": job.posted_at.isoformat() if job.posted_at else None,
@@ -416,6 +419,7 @@ def run_once(force: bool = False) -> dict:
 
     with SessionLocal() as session:
         seed_settings(session, yaml_settings)
+        backfill_job_classifications(session)
         targets = evaluation_targets(session)
 
         if not force and not get_bool(session, "agent_enabled", True):
