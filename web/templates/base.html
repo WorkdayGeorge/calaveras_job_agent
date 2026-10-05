@@ -54,6 +54,11 @@
     .row { display:flex; gap:12px; align-items:end; flex-wrap:wrap; }
     .row > div { flex:1; min-width:180px; }
     .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#eef2ff; font-size:12px; font-weight:700; }
+    .work-tabs { display:flex; gap:4px; margin:0; overflow-x:auto; border-bottom:1px solid var(--line); }
+    .work-tab { appearance:none; border:1px solid transparent; border-bottom:0; border-radius:9px 9px 0 0; padding:10px 16px; background:transparent; color:#475467; cursor:pointer; font:inherit; font-size:14px; font-weight:700; white-space:nowrap; }
+    .work-tab:hover { background:#f8fafc; color:#1d4ed8; }
+    .work-tab.active { margin-bottom:-1px; border-color:var(--line); background:#fff; color:#1d4ed8; }
+    .work-tab-panel { padding:16px 18px 18px; border:1px solid var(--line); border-top:0; border-radius:0 0 12px 12px; background:#fff; }
     h1 { margin-top:0; }
     h2 { margin-top:28px; }
     @media (max-width:900px) {
