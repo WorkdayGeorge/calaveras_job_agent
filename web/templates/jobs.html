@@ -63,7 +63,7 @@
 
     <div style="margin-top:12px">
       <button class="btn secondary">Apply filters</button>
-      {% if search_query or selected_category %}<a class="btn secondary" href="{{ request.url.remove_query_params('q', 'category') }}">Clear category and search</a>{% endif %}
+      {% if search_query or selected_category %}<a class="btn secondary" href="{{ request.url.remove_query_params(['q', 'category']) }}">Clear category and search</a>{% endif %}
     </div>
   </div>
 </form>
