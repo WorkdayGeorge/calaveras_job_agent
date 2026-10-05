@@ -1,4 +1,9 @@
 from pathlib import Path
+from types import SimpleNamespace
+
+from starlette.datastructures import URL
+
+from web.app import templates
 
 
 def test_user_jobs_apply_action_routes_through_application_prep():
@@ -32,3 +37,32 @@ def test_administrator_can_still_view_source_job_posting():
     template = Path("web/templates/jobs.html").read_text()
 
     assert '>View Job</a>' in template
+
+
+def test_selected_category_page_renders_clear_link_without_server_error():
+    request = SimpleNamespace(
+        query_params={},
+        url=URL(
+            "https://example.test/jobs?arrangement=remote"
+            "&category=Accounting%20%26%20Bookkeeping&q=clerk"
+        ),
+        session={},
+    )
+    html = templates.env.get_template("jobs.html").render(
+        request=request,
+        rows=[],
+        status_filter=None,
+        sort_by="newest_posted",
+        search_query="clerk",
+        category_options=(
+            "Accounting & Bookkeeping",
+            "Remote Jobs",
+        ),
+        selected_category="Accounting & Bookkeeping",
+        arrangement_options=("onsite", "hybrid", "remote"),
+        selected_arrangement="remote",
+        administrator_view=False,
+    )
+
+    assert "Clear category and search" in html
+    assert "arrangement=remote" in html
