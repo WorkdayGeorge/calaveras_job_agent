@@ -12,8 +12,6 @@ class RawJob:
     company: str
     location: str | None
     employment_type: str | None
-    category: str
-    work_arrangement: str
     description: str | None
     posted_at: datetime | None
     apply_url: str
@@ -29,6 +27,8 @@ class NormalizedJob:
     company: str
     location: str | None
     employment_type: str | None
+    category: str
+    work_arrangement: str
     description: str | None
     requirements: list[str]
     posted_at: datetime | None
