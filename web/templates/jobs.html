@@ -54,7 +54,7 @@
     <option value="company" {% if sort_by == "company" %}selected{% endif %}>Company A-Z</option>
   </select>
   <button class="btn secondary" style="margin-top:8px">Apply filters</button>
-  {% if search_query or selected_category or selected_arrangement %}<a class="btn secondary" style="margin-top:8px" href="/jobs?sort={{ sort_by }}">Clear filters</a>{% endif %}
+  {% if search_query or selected_category or selected_arrangement %}<a class="btn secondary" style="margin-top:8px" href="/jobs?sort={{ sort_by }}">Clear search and filters</a>{% endif %}
 </form>
 <table>
 {% if administrator_view %}
